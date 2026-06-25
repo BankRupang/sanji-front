@@ -1,1 +1,1 @@
-@AGENTS.md
+- API 명세서는 `docs/API.md`를 참고하세요.
