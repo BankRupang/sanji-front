@@ -1,0 +1,90 @@
+export function fmtNum(n: number | string | undefined | null): string {
+  return Number(n || 0).toLocaleString('ko-KR')
+}
+
+export function fmtDate(s: string | undefined | null): string {
+  if (!s) return '-'
+  return new Date(s).toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const emojiMap: Record<string, string> = {
+  사과: '🍎', 배: '🍐', 포도: '🍇', 딸기: '🍓', 감: '🫐',
+  수박: '🍉', 참외: '🍈', 복숭아: '🍑', 망고: '🥭', 바나나: '🍌',
+  오렌지: '🍊', 키위: '🥝', 토마토: '🍅', 당근: '🥕', 양파: '🧅',
+  마늘: '🧄', 고구마: '🍠', 가지: '🍆', 배추: '🥬', 양추: '🥦',
+  호박: '🎃', 오이: '🥒', 파프리카: '🫑', 콩: '🫘', 쌀: '🌾', 장미: '🌹',
+}
+
+export function emojiFor(name: string): string {
+  for (const k in emojiMap) {
+    if ((name || '').includes(k)) return emojiMap[k]
+  }
+  const defaults = ['🌾', '🍋', '🥦', '🫘', '🌿', '🌱']
+  return defaults[Math.abs((name || 'a').charCodeAt(0)) % 6]
+}
+
+export function bgClass(name: string): string {
+  const cls = ['green', 'yellow', 'purple']
+  return cls[Math.abs((name || 'a').charCodeAt(0)) % 3]
+}
+
+export function statusLabel(s: string): string {
+  const labels: Record<string, string> = {
+    READY: '대기중',
+    PROGRESS: '진행중',
+    RESULT_PENDING: '결과처리중',
+    WON: '낙찰',
+    SUCCESS: '거래완료',
+    FAIL: '유찰',
+    CANCELLED: '취소',
+  }
+  return labels[s] || s || '-'
+}
+
+export function parseJwt(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1]
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+  } catch {
+    return null
+  }
+}
+
+export function copyToClipboard(text: string, label: string, toast: (msg: string, type?: string) => void) {
+  if (!text) return
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast(`${label} 복사됨`, 'success'))
+    .catch(() => {
+      const el = document.createElement('textarea')
+      el.value = text
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      toast(`${label} 복사됨`, 'success')
+    })
+}
+
+export function orderStatusLabel(s: string): string {
+  const m: Record<string, string> = {
+    PENDING: '결제대기', PAID: '결제완료', FAILED: '결제실패', CANCELLED: '취소됨', REFUNDED: '환불됨',
+  }
+  return m[s] || s || '-'
+}
+
+export function orderStatusColor(s: string): string {
+  const m: Record<string, string> = {
+    PENDING: '#f59e0b', PAID: '#16a34a', FAILED: '#dc2626', CANCELLED: '#6b7280', REFUNDED: '#3b82f6',
+  }
+  return m[s] || '#6b7280'
+}
+
+export function orderTypeLabel(t: string): string {
+  return t === 'DEPOSIT' ? '보증금' : t === 'WINNING' ? '낙찰금' : t || '-'
+}

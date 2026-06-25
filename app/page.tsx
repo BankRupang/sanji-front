@@ -1,65 +1,62 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { apiCall } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
+import AuctionCard, { type AuctionItem } from '@/components/AuctionCard'
+
+export default function HomePage() {
+  const { token } = useAuth()
+  const [auctions, setAuctions] = useState<AuctionItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const r = await apiCall('GET', '/api/v1/auctions?status=PROGRESS&page=0&size=6', undefined, token)
+      if (r.ok) setAuctions(r.data?.data?.content || [])
+      setLoading(false)
+    }
+    load()
+  }, [token])
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <div className="hero">
+        <div className="hero-inner">
+          <div className="hero-text">
+            <h1>산지에서 직접,<br />경매로 만나다</h1>
+            <p>전국 농산물 생산자와 구매자를 잇는<br />실시간 경매 플랫폼</p>
+            <div className="hero-badges">
+              <span className="hero-badge">🔴 실시간 입찰</span>
+              <span className="hero-badge">✅ 신선 농산물</span>
+              <span className="hero-badge">📦 산지 직송</span>
+            </div>
+          </div>
+          <div className="hero-img">🌾</div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      <div className="container">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div className="section-title">진행 중인 경매</div>
+          <Link href="/auctions" className="btn btn-outline btn-sm">전체 보기 →</Link>
         </div>
-      </main>
-    </div>
-  );
+        <div className="section-sub">지금 입찰 가능한 경매입니다</div>
+
+        {loading ? (
+          <div className="loading"><div className="spinner" />불러오는 중...</div>
+        ) : auctions.length > 0 ? (
+          <div className="auction-grid">
+            {auctions.map(a => <AuctionCard key={a.id || a.auctionId} a={a} />)}
+          </div>
+        ) : (
+          <div className="empty">
+            <div className="empty-icon">🏷️</div>
+            <h3>진행 중인 경매가 없습니다</h3>
+          </div>
+        )}
+      </div>
+    </>
+  )
 }
