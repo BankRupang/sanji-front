@@ -67,6 +67,13 @@ export default function AuctionDetailPage() {
   }, [id])
 
   useEffect(() => {
+    if (!token || userRole !== 'BUYER' || !id) return
+    const onVisible = () => { if (!document.hidden) checkDepositStatus() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [token, userRole, id])
+
+  useEffect(() => {
     if (!isLoaded || !id) return
     let cancelled = false
 
@@ -241,6 +248,7 @@ export default function AuctionDetailPage() {
     )
     if (r.ok) {
       toast('보증금 결제가 완료되었습니다.', 'success')
+      setHasPaidDeposit(true)
       setDepositOpen(false)
     } else {
       toast('결제 승인 실패: ' + (r.data?.message || r.data?.data?.message || ''), 'error')
