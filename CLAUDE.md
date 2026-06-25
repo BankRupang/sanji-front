@@ -1,1 +1,2 @@
 - API 명세서는 `docs/API.md`를 참고하세요.
+- 테이블 명세서는 `docs/TABLES.md`를 참고하세요.
