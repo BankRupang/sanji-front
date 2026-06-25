@@ -47,33 +47,19 @@ export default function AuctionDetailPage() {
   const [bidAmount, setBidAmount] = useState(0)
   const [bidHistory, setBidHistory] = useState<BidItem[]>([])
   const [connected, setConnected] = useState(false)
+  const [hasPaidDeposit, setHasPaidDeposit] = useState(false)
 
   // Deposit modal
   const [depositOpen, setDepositOpen] = useState(false)
   const [depositAmount, setDepositAmount] = useState(0)
   const [depositStep, setDepositStep] = useState<'toss' | 'confirm'>('toss')
   const [depPaymentKey, setDepPaymentKey] = useState('')
-  const [depTossOrderId, setDepTossOrderId] = useState('')
+  const [deporderId, setDeporderId] = useState('')
 
   const stompRef = useRef<Client | null>(null)
   const bidUnitRef = useRef(1000)
 
   useEffect(() => {
-    // Handle Toss redirect (does not require auth)
-    const params = new URLSearchParams(window.location.search)
-    const paymentType = params.get('paymentType')
-    const paymentKey = params.get('paymentKey')
-    const tossOrderId = params.get('orderId')
-    const amount = parseInt(params.get('amount') || '0')
-
-    if (paymentType === 'DEPOSIT_SUCCESS' && paymentKey && tossOrderId) {
-      handleTossCallback(paymentKey, tossOrderId, amount)
-      window.history.replaceState({}, '', window.location.pathname)
-    } else if (paymentType === 'DEPOSIT_FAIL') {
-      toast('결제 실패: ' + (params.get('message') || '결제가 취소되었거나 실패했습니다.'), 'error')
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-
     return () => {
       stompRef.current?.deactivate()
       stompRef.current = null
@@ -82,14 +68,20 @@ export default function AuctionDetailPage() {
 
   useEffect(() => {
     if (!isLoaded || !id) return
-    loadAuction()
+    let cancelled = false
+
+    if (!cancelled) loadAuction()
+    if (!cancelled && token && userRole === 'BUYER') checkDepositStatus()
+
+    return () => { cancelled = true }
   }, [id, isLoaded])
 
-  async function handleTossCallback(paymentKey: string, tossOrderId: string, amount: number) {
-    toast('결제 승인 진행 중...', '')
-    const r = await apiCall('POST', '/api/v1/payments/confirm', { paymentKey, tossOrderId, amount }, token)
-    if (r.ok) toast('보증금 결제가 성공적으로 완료되었습니다!', 'success')
-    else toast('결제 승인 실패: ' + (r.data?.message || r.data?.data?.message || ''), 'error')
+  async function checkDepositStatus() {
+    const r = await apiCall('GET', '/api/v1/orders/deposit/me?page=0&size=50', undefined, token)
+    if (r.ok) {
+      const orders: { auctionId: string; status: string }[] = r.data?.data?.content || []
+      setHasPaidDeposit(orders.some(o => o.auctionId === id && o.status === 'PAYMENT_SUCCESS'))
+    }
   }
 
   async function loadAuction() {
@@ -104,7 +96,7 @@ export default function AuctionDetailPage() {
       setBidAmount(price + bidUnitRef.current)
       setDepositAmount(a.startPrice || 0)
       if (a.status === 'PROGRESS') {
-        connectBid(id)
+        if (token) connectBid(id)
         syncCurrentPrice(id)
       }
     } else {
@@ -223,7 +215,7 @@ export default function AuctionDetailPage() {
       order = r.data?.data || r.data
     }
 
-    setDepTossOrderId(order.orderNumber || '')
+    setDeporderId(order.orderNumber || '')
     try {
       const TossPayments = (window as unknown as { TossPayments: TossPaymentsFn }).TossPayments
       TossPayments('test_ck_24xLea5zVAJ0NLBRvPNlrQAMYNwW').requestPayment('카드', {
@@ -231,8 +223,8 @@ export default function AuctionDetailPage() {
         orderId: order.orderNumber,
         orderName: '보증금 납부',
         customerName: '구매자',
-        successUrl: window.location.origin + window.location.pathname + '?paymentType=DEPOSIT_SUCCESS',
-        failUrl: window.location.origin + window.location.pathname + '?paymentType=DEPOSIT_FAIL',
+        successUrl: `${window.location.origin}/payments/success?auctionId=${id}`,
+        failUrl: `${window.location.origin}/payments/fail?auctionId=${id}`,
       })
     } catch {
       toast('Toss 결제창 초기화 실패', 'error')
@@ -244,7 +236,7 @@ export default function AuctionDetailPage() {
     const amtStr = String(depositAmount).replace(/[^0-9]/g, '')
     const r = await apiCall(
       'POST', '/api/v1/payments/confirm',
-      { paymentKey: depPaymentKey, tossOrderId: depTossOrderId, amount: parseInt(amtStr) || 0 },
+      { paymentKey: depPaymentKey, orderId: deporderId, amount: parseInt(amtStr) || 0 },
       token,
     )
     if (r.ok) {
@@ -410,7 +402,7 @@ export default function AuctionDetailPage() {
               </Link>
             )}
 
-            {isActive && token && userRole === 'BUYER' && (
+            {isActive && token && userRole === 'BUYER' && !hasPaidDeposit && (
               <button
                 className="btn btn-accent"
                 style={{ width: '100%', marginBottom: '8px' }}
@@ -470,8 +462,8 @@ export default function AuctionDetailPage() {
                   <input value={depPaymentKey} onChange={e => setDepPaymentKey(e.target.value)} placeholder="Toss 결제 완료 후 받은 paymentKey" />
                 </div>
                 <div className="form-group">
-                  <label>tossOrderId <span className="req">*</span></label>
-                  <input value={depTossOrderId} onChange={e => setDepTossOrderId(e.target.value)} placeholder="Toss orderId" readOnly />
+                  <label>orderId <span className="req">*</span></label>
+                  <input value={deporderId} onChange={e => setDeporderId(e.target.value)} placeholder="Toss orderId" readOnly />
                 </div>
                 <button className="btn btn-primary" style={{ width: '100%' }} onClick={confirmDepositPayment}>
                   결제 승인

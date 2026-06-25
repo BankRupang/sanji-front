@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AuctionCard, { type AuctionItem } from '@/components/AuctionCard'
 
 export default function AuctionsPage() {
-  const { token, userRole } = useAuth()
+  const { token, userRole, isLoaded } = useAuth()
   const toast = useToast()
   const router = useRouter()
 
@@ -24,7 +24,7 @@ export default function AuctionsPage() {
 
   const canCreate = userRole === 'SELLER' || userRole === 'MASTER'
 
-  useEffect(() => { loadAuctions() }, [status, page])
+  useEffect(() => { if (isLoaded) loadAuctions() }, [status, page, isLoaded])
 
   async function loadAuctions() {
     setLoading(true)
