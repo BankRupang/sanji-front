@@ -37,7 +37,7 @@ type TossPaymentsFn = (clientKey: string) => {
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { token, userId, userRole } = useAuth()
+  const { token, userId, userRole, isLoaded } = useAuth()
   const toast = useToast()
   const router = useRouter()
 
@@ -59,9 +59,7 @@ export default function AuctionDetailPage() {
   const bidUnitRef = useRef(1000)
 
   useEffect(() => {
-    if (id) loadAuction()
-
-    // Handle Toss redirect
+    // Handle Toss redirect (does not require auth)
     const params = new URLSearchParams(window.location.search)
     const paymentType = params.get('paymentType')
     const paymentKey = params.get('paymentKey')
@@ -81,6 +79,11 @@ export default function AuctionDetailPage() {
       stompRef.current = null
     }
   }, [id])
+
+  useEffect(() => {
+    if (!isLoaded || !id) return
+    loadAuction()
+  }, [id, isLoaded])
 
   async function handleTossCallback(paymentKey: string, tossOrderId: string, amount: number) {
     toast('결제 승인 진행 중...', '')
