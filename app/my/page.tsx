@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
@@ -24,7 +24,7 @@ interface Notification {
 }
 
 export default function MyPage() {
-  const { token, userId, userName, userRole, isLoaded } = useAuth()
+  const { token, userName, userRole, isLoaded } = useAuth()
   const toast = useToast()
   const router = useRouter()
 
@@ -49,12 +49,7 @@ export default function MyPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notiLoading, setNotiLoading] = useState(false)
 
-  useEffect(() => {
-    if (isLoaded && !token) { router.push('/login'); return }
-    if (token) loadUserInfo()
-  }, [token, isLoaded])
-
-  async function loadUserInfo() {
+  const loadUserInfo = useCallback(async () => {
     const r = await apiCall('GET', '/api/v1/users/me', undefined, token)
     if (r.ok) {
       const d = r.data?.data || r.data
@@ -62,7 +57,12 @@ export default function MyPage() {
       setProfileForm({ name: d.name || '', phone: d.phone || '', slackId: d.slackId || '' })
       setBizForm({ businessNumber: d.businessNumber || '' })
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (isLoaded && !token) { router.push('/login'); return }
+    if (token) loadUserInfo()
+  }, [token, isLoaded, router, loadUserInfo])
 
   async function loadOrders() {
     setOrdersLoading(true)

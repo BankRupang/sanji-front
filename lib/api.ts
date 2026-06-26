@@ -1,18 +1,18 @@
 export const GW = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-export interface ApiResponse<T = unknown> {
+export interface ApiResponse {
   ok: boolean
   status: number
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any
 }
 
-export async function apiCall<T = unknown>(
+export async function apiCall(
   method: string,
   path: string,
   body?: unknown,
   token?: string,
-): Promise<ApiResponse<T>> {
+): Promise<ApiResponse> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 

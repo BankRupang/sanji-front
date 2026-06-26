@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -24,9 +24,7 @@ export default function AuctionsPage() {
 
   const canCreate = userRole === 'SELLER' || userRole === 'MASTER'
 
-  useEffect(() => { if (isLoaded) loadAuctions() }, [status, page, isLoaded])
-
-  async function loadAuctions() {
+  const loadAuctions = useCallback(async () => {
     setLoading(true)
     const q = status ? `&status=${status}` : ''
     const r = await apiCall('GET', `/api/v1/auctions?page=${page}&size=12${q}`, undefined, token)
@@ -35,7 +33,9 @@ export default function AuctionsPage() {
       setTotalPages(r.data?.data?.totalPages || 1)
     }
     setLoading(false)
-  }
+  }, [status, page, token])
+
+  useEffect(() => { if (isLoaded) loadAuctions() }, [status, page, isLoaded, loadAuctions])
 
   async function doCreateAuction() {
     const { productId, startPrice, bidUnit, startAt } = caForm

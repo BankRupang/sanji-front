@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import ProductCard, { type ProductItem } from '@/components/ProductCard'
-import { fmtNum, fmtDate, emojiFor, bgClass, copyToClipboard } from '@/lib/utils'
+import { emojiFor, copyToClipboard } from '@/lib/utils'
 
 export default function ProductsPage() {
   const { token, userRole, userId } = useAuth()
@@ -27,14 +27,14 @@ export default function ProductsPage() {
 
   const canCreate = userRole === 'SELLER' || userRole === 'MASTER'
 
-  useEffect(() => { loadProducts() }, [token])
-
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     setLoading(true)
     const r = await apiCall('GET', '/api/v1/products?page=0&size=20', undefined, token)
     if (r.ok) setProducts(r.data?.data?.content || [])
     setLoading(false)
-  }
+  }, [token])
+
+  useEffect(() => { loadProducts() }, [token, loadProducts])
 
   async function showDetail(id: string) {
     setDetailOpen(true)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -28,41 +28,10 @@ export default function AiPage() {
   ])
   const [input, setInput] = useState('')
   const msgsRef = useRef<HTMLDivElement>(null)
+  const activeSessionRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (token) loadSessions()
-  }, [token])
-
-  useEffect(() => {
-    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
-  }, [messages])
-
-  async function loadSessions() {
-    const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
-    if (r.ok) {
-      const items: Session[] = r.data?.data?.content || []
-      setSessions(items)
-      if (items.length > 0 && !activeSession) {
-        selectSession(items[0].id || items[0].sessionId || '')
-      }
-    }
-  }
-
-  async function createSession() {
-    if (!token) { toast('로그인이 필요합니다.', 'error'); return }
-    const r = await apiCall('POST', '/api/v1/ai/sessions', undefined, token)
-    if (r.ok) {
-      const d = r.data?.data || r.data
-      const sid = d.id || d.sessionId
-      setActiveSession(sid)
-      setMessages([{ role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' }])
-      loadSessions()
-    } else {
-      toast('세션 생성 실패', 'error')
-    }
-  }
-
-  async function selectSession(id: string) {
+  const selectSession = useCallback(async (id: string) => {
+    activeSessionRef.current = id
     setActiveSession(id)
     const r = await apiCall('GET', `/api/v1/ai/sessions/${id}/messages`, undefined, token)
     if (r.ok) {
@@ -72,6 +41,40 @@ export default function AiPage() {
         { role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' },
         ...msgs.map(m => ({ role: m.role === 'USER' ? 'user' : 'ai', text: m.content || '', time: now })),
       ])
+    }
+  }, [token])
+
+  const loadSessions = useCallback(async () => {
+    const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
+    if (r.ok) {
+      const items: Session[] = r.data?.data?.content || []
+      setSessions(items)
+      if (items.length > 0 && !activeSessionRef.current) {
+        selectSession(items[0].id || items[0].sessionId || '')
+      }
+    }
+  }, [token, selectSession])
+
+  useEffect(() => {
+    if (token) loadSessions()
+  }, [token, loadSessions])
+
+  useEffect(() => {
+    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
+  }, [messages])
+
+  async function createSession() {
+    if (!token) { toast('로그인이 필요합니다.', 'error'); return }
+    const r = await apiCall('POST', '/api/v1/ai/sessions', undefined, token)
+    if (r.ok) {
+      const d = r.data?.data || r.data
+      const sid = d.id || d.sessionId
+      activeSessionRef.current = sid
+      setActiveSession(sid)
+      setMessages([{ role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' }])
+      loadSessions()
+    } else {
+      toast('세션 생성 실패', 'error')
     }
   }
 
@@ -121,7 +124,7 @@ export default function AiPage() {
               로그인 후 이용 가능합니다
             </div>
           ) : sessions.length > 0 ? (
-            sessions.map((s, i) => {
+            sessions.map((s) => {
               const sid = s.id || s.sessionId || ''
               return (
                 <div

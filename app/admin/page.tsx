@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiCall, GW } from '@/lib/api'
@@ -58,15 +58,8 @@ export default function AdminPage() {
   const [docSrc, setDocSrc] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (isLoaded && (!token || (userRole !== 'MASTER' && userRole !== 'MANAGER'))) {
-      router.push('/')
-    }
-    if (token) loadUsers()
-  }, [token, isLoaded])
-
   // ── Users ────────────────────────────────────────────────────────────────
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     setUsersLoading(true)
     const q = new URLSearchParams({ page: '0', size: '50' })
     if (roleFilter) q.set('role', roleFilter)
@@ -75,7 +68,14 @@ export default function AdminPage() {
     if (r.ok) setUsers(r.data?.data?.content || [])
     else toast('사용자 목록 불러오기 실패. 관리자 권한을 확인하세요.', 'error')
     setUsersLoading(false)
-  }
+  }, [token, roleFilter, statusFilter, toast])
+
+  useEffect(() => {
+    if (isLoaded && (!token || (userRole !== 'MASTER' && userRole !== 'MANAGER'))) {
+      router.push('/')
+    }
+    if (token) loadUsers()
+  }, [token, isLoaded, userRole, router, loadUsers])
 
   async function viewUser(uid: string) {
     const r = await apiCall('GET', `/api/v1/user/one?userId=${uid}`, undefined, token)

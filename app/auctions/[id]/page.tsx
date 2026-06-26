@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Client } from '@stomp/stompjs'
@@ -66,53 +66,20 @@ export default function AuctionDetailPage() {
     }
   }, [id])
 
-  useEffect(() => {
-    if (!token || userRole !== 'BUYER' || !id) return
-    const onVisible = () => { if (!document.hidden) checkDepositStatus() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [token, userRole, id])
-
-  useEffect(() => {
-    if (!isLoaded || !id) return
-    let cancelled = false
-
-    if (!cancelled) loadAuction()
-    if (!cancelled && token && userRole === 'BUYER') checkDepositStatus()
-
-    return () => { cancelled = true }
-  }, [id, isLoaded])
-
-  async function checkDepositStatus() {
-    const r = await apiCall('GET', '/api/v1/orders/deposit/me?page=0&size=50', undefined, token)
+  const syncCurrentPrice = useCallback(async (auctionId: string) => {
+    const r = await apiCall('GET', `/api/v1/bids/auctions/${auctionId}/highest`, undefined, token)
     if (r.ok) {
-      const orders: { auctionId: string; status: string }[] = r.data?.data?.content || []
-      setHasPaidDeposit(orders.some(o => o.auctionId === id && o.status === 'PAYMENT_SUCCESS'))
-    }
-  }
-
-  async function loadAuction() {
-    setLoading(true)
-    const r = await apiCall('GET', `/api/v1/auctions/${id}`, undefined, token)
-    if (r.ok) {
-      const a: Auction = r.data?.data || r.data
-      setAuction(a)
-      const price = a.currentPrice || a.startPrice || 0
-      bidUnitRef.current = a.bidUnit || 1000
-      setCurrentPrice(price)
-      setBidAmount(price + bidUnitRef.current)
-      setDepositAmount(a.startPrice || 0)
-      if (a.status === 'PROGRESS') {
-        if (token) connectBid(id)
-        syncCurrentPrice(id)
+      const d = r.data?.data || r.data
+      const cp = d?.finalPrice || d?.currentPrice
+      if (cp) {
+        setCurrentPrice(cp)
+        setBidAmount(cp + bidUnitRef.current)
+        toast('현재가 동기화: ' + fmtNum(cp) + '원', 'success')
       }
-    } else {
-      toast('경매를 불러올 수 없습니다.', 'error')
     }
-    setLoading(false)
-  }
+  }, [token, toast])
 
-  function connectBid(auctionId: string) {
+  const connectBid = useCallback((auctionId: string) => {
     stompRef.current?.deactivate()
     stompRef.current = null
 
@@ -156,20 +123,53 @@ export default function AuctionDetailPage() {
       onDisconnect: () => { setConnected(false); stompRef.current = null },
     })
     client.activate()
-  }
+  }, [userId, token, toast, syncCurrentPrice])
 
-  async function syncCurrentPrice(auctionId: string) {
-    const r = await apiCall('GET', `/api/v1/bids/auctions/${auctionId}/highest`, undefined, token)
+  const checkDepositStatus = useCallback(async () => {
+    const r = await apiCall('GET', '/api/v1/orders/deposit/me?page=0&size=50', undefined, token)
     if (r.ok) {
-      const d = r.data?.data || r.data
-      const cp = d?.finalPrice || d?.currentPrice
-      if (cp) {
-        setCurrentPrice(cp)
-        setBidAmount(cp + bidUnitRef.current)
-        toast('현재가 동기화: ' + fmtNum(cp) + '원', 'success')
-      }
+      const orders: { auctionId: string; status: string }[] = r.data?.data?.content || []
+      setHasPaidDeposit(orders.some(o => o.auctionId === id && o.status === 'PAYMENT_SUCCESS'))
     }
-  }
+  }, [token, id])
+
+  const loadAuction = useCallback(async () => {
+    setLoading(true)
+    const r = await apiCall('GET', `/api/v1/auctions/${id}`, undefined, token)
+    if (r.ok) {
+      const a: Auction = r.data?.data || r.data
+      setAuction(a)
+      const price = a.currentPrice || a.startPrice || 0
+      bidUnitRef.current = a.bidUnit || 1000
+      setCurrentPrice(price)
+      setBidAmount(price + bidUnitRef.current)
+      setDepositAmount(a.startPrice || 0)
+      if (a.status === 'PROGRESS') {
+        if (token) connectBid(id)
+        syncCurrentPrice(id)
+      }
+    } else {
+      toast('경매를 불러올 수 없습니다.', 'error')
+    }
+    setLoading(false)
+  }, [id, token, toast, connectBid, syncCurrentPrice])
+
+  useEffect(() => {
+    if (!token || userRole !== 'BUYER' || !id) return
+    const onVisible = () => { if (!document.hidden) checkDepositStatus() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [token, userRole, id, checkDepositStatus])
+
+  useEffect(() => {
+    if (!isLoaded || !id) return
+    let cancelled = false
+
+    if (!cancelled) loadAuction()
+    if (!cancelled && token && userRole === 'BUYER') checkDepositStatus()
+
+    return () => { cancelled = true }
+  }, [id, isLoaded, token, userRole, loadAuction, checkDepositStatus])
 
   async function placeBid() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }
@@ -205,7 +205,7 @@ export default function AuctionDetailPage() {
 
   async function initiateDeposit() {
     if (!token) { router.push('/login'); return }
-    let r = await apiCall('POST', '/api/v1/orders/deposit', { auctionId: id }, token)
+    const r = await apiCall('POST', '/api/v1/orders/deposit', { auctionId: id }, token)
     let order = null
 
     if (!r.ok) {
