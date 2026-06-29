@@ -27,12 +27,55 @@ export default function AiPage() {
     { role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' },
   ])
   const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+
   const msgsRef = useRef<HTMLDivElement>(null)
+  // ref로 activeSession 최신값 유지 (stale closure 방지)
   const activeSessionRef = useRef<string | null>(null)
 
-  const selectSession = useCallback(async (id: string) => {
-    activeSessionRef.current = id
+  useEffect(() => {
+    activeSessionRef.current = activeSession
+  }, [activeSession])
+
+  useEffect(() => {
+    if (token) loadSessions()
+  }, [token])
+
+  useEffect(() => {
+    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
+  }, [messages])
+
+  async function loadSessions() {
+    const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
+    if (r.ok) {
+      const items: Session[] = r.data?.data?.content || []
+      setSessions(items)
+      // 현재 활성 세션이 없을 때만 첫 세션 자동 선택 (ref로 최신값 확인)
+      if (items.length > 0 && !activeSessionRef.current) {
+        selectSession(items[0].id || items[0].sessionId || '')
+      }
+    }
+  }
+
+  async function createSession() {
+    if (!token) { toast('로그인이 필요합니다.', 'error'); return }
+    const r = await apiCall('POST', '/api/v1/ai/sessions', undefined, token)
+    if (r.ok) {
+      const d = r.data?.data || r.data
+      const sid = d.id || d.sessionId
+      setActiveSession(sid)
+      activeSessionRef.current = sid
+      setMessages([{ role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' }])
+      // 세션 목록에 바로 추가 (loadSessions 호출 없이)
+      setSessions(prev => [d, ...prev.filter(s => (s.id || s.sessionId) !== sid)])
+    } else {
+      toast('세션 생성 실패', 'error')
+    }
+  }
+
+  async function selectSession(id: string) {
     setActiveSession(id)
+    activeSessionRef.current = id
     const r = await apiCall('GET', `/api/v1/ai/sessions/${id}/messages`, undefined, token)
     if (r.ok) {
       const msgs: Message[] = r.data?.data || []
@@ -81,32 +124,49 @@ export default function AiPage() {
   async function sendChat() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }
     const msg = input.trim()
-    if (!msg) return
+    if (!msg || sending) return
 
-    let sid = activeSession
+    // 입력창 즉시 초기화
+    setInput('')
+
+    let sid = activeSessionRef.current
+
+    // 세션이 없으면 먼저 생성
     if (!sid) {
       const r = await apiCall('POST', '/api/v1/ai/sessions', undefined, token)
-      if (!r.ok) { toast('세션 생성 실패', 'error'); return }
+      if (!r.ok) { toast('세션 생성 실패', 'error'); setInput(msg); return }
       const d = r.data?.data || r.data
-      sid = d.id || d.sessionId
-      setActiveSession(sid || null)
-      loadSessions()
+      sid = d.id || d.sessionId || ''
+      setActiveSession(sid)
+      activeSessionRef.current = sid
+      // 세션 목록에 바로 추가 (loadSessions 없이 → 메시지 초기화 방지)
+      setSessions(prev => [d, ...prev.filter(s => (s.id || s.sessionId) !== sid)])
     }
 
-    setInput('')
     const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+
+    // 내 메시지 즉시 표시
     setMessages(prev => [...prev, { role: 'user', text: msg, time: now }])
 
+    // AI 응답 대기 중 표시
+    setSending(true)
+    setMessages(prev => [...prev, { role: 'ai', text: '...', time: now }])
+
     const r = await apiCall('POST', `/api/v1/ai/sessions/${sid}/chat`, { message: msg }, token)
+
+    setSending(false)
+
     if (r.ok) {
       const d = r.data?.data || r.data
-      setMessages(prev => [...prev, {
-        role: 'ai',
-        text: d.answer || d.message || d.response || JSON.stringify(d),
-        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-      }])
+      const answer = d.answer || d.message || d.response || JSON.stringify(d)
+      const replyTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      // 마지막 '...' 메시지를 실제 답변으로 교체
+      setMessages(prev => [...prev.slice(0, -1), { role: 'ai', text: answer, time: replyTime }])
     } else {
-      setMessages(prev => [...prev, { role: 'ai', text: '죄송합니다, 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', time: now }])
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'ai', text: '죄송합니다, 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', time: now },
+      ])
     }
   }
 
@@ -124,7 +184,7 @@ export default function AiPage() {
               로그인 후 이용 가능합니다
             </div>
           ) : sessions.length > 0 ? (
-            sessions.map((s) => {
+            sessions.map(s => {
               const sid = s.id || s.sessionId || ''
               return (
                 <div
@@ -150,7 +210,16 @@ export default function AiPage() {
         <div className="chat-messages" ref={msgsRef}>
           {messages.map((m, i) => (
             <div key={i} className={`msg msg-${m.role}`}>
-              <div className="msg-bubble" style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
+              <div
+                className="msg-bubble"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  opacity: m.text === '...' ? 0.5 : 1,
+                  fontStyle: m.text === '...' ? 'italic' : 'normal',
+                }}
+              >
+                {m.text}
+              </div>
               <div className="msg-time">{m.time}</div>
             </div>
           ))}
@@ -162,11 +231,14 @@ export default function AiPage() {
             onChange={e => setInput(e.target.value)}
             placeholder="메시지를 입력하세요..."
             rows={1}
+            disabled={sending}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() }
             }}
           />
-          <button className="btn btn-primary" onClick={sendChat}>전송</button>
+          <button className="btn btn-primary" onClick={sendChat} disabled={sending}>
+            {sending ? '...' : '전송'}
+          </button>
         </div>
       </div>
     </div>

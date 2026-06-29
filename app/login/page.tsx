@@ -42,10 +42,10 @@ export default function LoginPage() {
         <div className="auth-divider">테스트 계정으로 빠른 로그인</div>
         <div className="quick-login">
           {[
-            { u: 'buyer99',  label: '🛒 Buyer' },
-            { u: 'seller99', label: '🌾 Seller' },
-            { u: 'manager1', label: '🏢 Manager' },
-            { u: 'master1',  label: '👑 Master' },
+            { u: 'testbuyer',  label: '🛒 Buyer' },
+            { u: 'testseller', label: '🌾 Seller' },
+            { u: 'testmanager', label: '🏢 Manager' },
+            { u: 'testmaster',  label: '👑 Master' },
           ].map(({ u, label }) => (
             <div key={u} className="ql-btn" onClick={() => doLogin(u, 'Test1234!')}>
               {label}<br />

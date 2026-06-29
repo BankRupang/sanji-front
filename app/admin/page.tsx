@@ -11,7 +11,7 @@ import { fmtNum, fmtDate, statusLabel } from '@/lib/utils'
 type AdminTab = 'users' | 'products' | 'auctions' | 'ai-docs'
 
 interface User {
-  id?: string; userId?: string; name?: string; email?: string;
+  id?: string; userId?: string; uuid?: string; name?: string; email?: string;
   role?: string; status?: string; phone?: string; businessNumber?: string; slackId?: string;
 }
 
@@ -43,6 +43,8 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userDetailOpen, setUserDetailOpen] = useState(false)
+  const [userIdInput, setUserIdInput] = useState('')
+  const [userIdSearching, setUserIdSearching] = useState(false)
 
   // Products
   const [products, setProducts] = useState<Product[]>([])
@@ -65,8 +67,10 @@ export default function AdminPage() {
     if (roleFilter) q.set('role', roleFilter)
     if (statusFilter) q.set('status', statusFilter)
     const r = await apiCall('GET', `/api/v1/users/all?${q}`, undefined, token)
-    if (r.ok) setUsers(r.data?.data?.content || [])
-    else toast('사용자 목록 불러오기 실패. 관리자 권한을 확인하세요.', 'error')
+    if (r.ok) {
+      const list = r.data?.data?.content || []
+      setUsers(list)
+    } else toast('사용자 목록 불러오기 실패. 관리자 권한을 확인하세요.', 'error')
     setUsersLoading(false)
   }, [token, roleFilter, statusFilter, toast])
 
@@ -77,10 +81,30 @@ export default function AdminPage() {
     if (token) loadUsers()
   }, [token, isLoaded, userRole, router, loadUsers])
 
-  async function viewUser(uid: string) {
+  async function searchUserById() {
+    const uid = userIdInput.trim()
+    if (!uid) { toast('User ID를 입력하세요.', 'error'); return }
+    setUserIdSearching(true)
     const r = await apiCall('GET', `/api/v1/user/one?userId=${uid}`, undefined, token)
-    if (r.ok) { setSelectedUser(r.data?.data || r.data); setUserDetailOpen(true) }
-    else toast('사용자 조회 실패', 'error')
+    setUserIdSearching(false)
+    if (r.ok) {
+      setSelectedUser(r.data?.data || r.data)
+      setUserDetailOpen(true)
+    } else {
+      toast('조회 실패: UUID가 맞는지 확인하세요. (' + (r.data?.message || r.status) + ')', 'error')
+    }
+  }
+
+  async function viewUser(user: User) {
+    // 목록 데이터로 즉시 모달 오픈 (로딩 없이 바로 보이게)
+    setSelectedUser(user)
+    setUserDetailOpen(true)
+    // 목록 응답의 userId로 상세 조회하여 보강
+    const uid = user.userId || user.id || user.uuid
+    if (uid) {
+      const r = await apiCall('GET', `/api/v1/user/one?userId=${uid}`, undefined, token)
+      if (r.ok) setSelectedUser(prev => ({ ...prev, ...(r.data?.data || r.data) }))
+    }
   }
 
   async function suspendUser(uid: string) {
@@ -209,13 +233,26 @@ export default function AdminPage() {
             </select>
             <button className="btn btn-primary btn-sm" onClick={loadUsers}>검색</button>
           </div>
+          <div className="filter-bar" style={{ marginBottom: '16px' }}>
+            <span className="filter-label">UUID 직접 조회</span>
+            <input
+              style={{ flex: 1, minWidth: '260px' }}
+              value={userIdInput}
+              onChange={e => setUserIdInput(e.target.value)}
+              placeholder="User UUID 붙여넣기"
+              onKeyDown={e => e.key === 'Enter' && searchUserById()}
+            />
+            <button className="btn btn-outline btn-sm" onClick={searchUserById} disabled={userIdSearching}>
+              {userIdSearching ? '조회 중...' : '조회'}
+            </button>
+          </div>
           {usersLoading ? <div className="loading"><div className="spinner" /></div> : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>이름</th><th>역할</th><th>상태</th><th>이메일</th><th>관리</th></tr></thead>
+                <thead><tr><th>이름</th><th>역할</th><th>상태</th><th>이메일</th><th>User ID</th><th>관리</th></tr></thead>
                 <tbody>
-                  {users.map(u => (
-                    <tr key={u.id || u.userId}>
+                  {users.map((u, i) => (
+                    <tr key={u.userId || u.id || u.email || i}>
                       <td style={{ fontWeight: 600 }}>{u.name || '-'}</td>
                       <td><span className={`badge-role role-${u.role}`}>{u.role || '-'}</span></td>
                       <td>
@@ -227,8 +264,19 @@ export default function AdminPage() {
                       </td>
                       <td style={{ color: 'var(--neu500)' }}>{u.email || '-'}</td>
                       <td>
+                        {u.userId ? (
+                          <span
+                            style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--neu400)', cursor: 'pointer' }}
+                            title={u.userId}
+                            onClick={() => { navigator.clipboard.writeText(u.userId!); toast('복사됨', 'success') }}
+                          >
+                            {u.userId.slice(0, 8)}…
+                          </span>
+                        ) : <span style={{ color: 'var(--neu300)' }}>-</span>}
+                      </td>
+                      <td>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => viewUser(String(u.id || u.userId))}>상세</button>
+                          <button className="btn btn-outline btn-sm" onClick={() => viewUser(u)}>상세</button>
                           {u.status === 'ACTIVE' && <button className="btn btn-danger btn-sm" onClick={() => suspendUser(String(u.id || u.userId))}>정지</button>}
                           {u.status === 'SUSPENDED' && <button className="btn btn-outline btn-sm" onClick={() => unsuspendUser(String(u.id || u.userId))}>해제</button>}
                         </div>
@@ -349,6 +397,18 @@ export default function AdminPage() {
               <button className="modal-close" onClick={() => setUserDetailOpen(false)}>×</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {u.userId && (
+                <div className="form-group">
+                  <label>User ID</label>
+                  <div
+                    style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--neu500)', cursor: 'pointer', wordBreak: 'break-all' }}
+                    title="클릭하여 복사"
+                    onClick={() => { navigator.clipboard.writeText(u.userId!); toast('User ID 복사됨', 'success') }}
+                  >
+                    {u.userId} 📋
+                  </div>
+                </div>
+              )}
               <div className="form-group"><label>이름</label><div style={{ fontWeight: 600 }}>{u.name || '-'}</div></div>
               <div className="form-group"><label>이메일</label><div style={{ color: 'var(--neu500)' }}>{u.email || '-'}</div></div>
               <div className="form-group"><label>역할</label><span className={`badge-role role-${u.role}`}>{u.role || '-'}</span></div>
