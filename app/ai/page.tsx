@@ -37,15 +37,7 @@ export default function AiPage() {
     activeSessionRef.current = activeSession
   }, [activeSession])
 
-  useEffect(() => {
-    if (token) loadSessions()
-  }, [token])
-
-  useEffect(() => {
-    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
-  }, [messages])
-
-  async function loadSessions() {
+  const loadSessions = useCallback(async () => {
     const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
     if (r.ok) {
       const items: Session[] = r.data?.data?.content || []
@@ -55,7 +47,7 @@ export default function AiPage() {
         selectSession(items[0].id || items[0].sessionId || '')
       }
     }
-  }
+  }, [token])
 
   async function createSession() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }
@@ -85,18 +77,7 @@ export default function AiPage() {
         ...msgs.map(m => ({ role: m.role === 'USER' ? 'user' : 'ai', text: m.content || '', time: now })),
       ])
     }
-  }, [token])
-
-  const loadSessions = useCallback(async () => {
-    const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
-    if (r.ok) {
-      const items: Session[] = r.data?.data?.content || []
-      setSessions(items)
-      if (items.length > 0 && !activeSessionRef.current) {
-        selectSession(items[0].id || items[0].sessionId || '')
-      }
-    }
-  }, [token, selectSession])
+  }
 
   useEffect(() => {
     if (token) loadSessions()
@@ -105,21 +86,6 @@ export default function AiPage() {
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
   }, [messages])
-
-  async function createSession() {
-    if (!token) { toast('로그인이 필요합니다.', 'error'); return }
-    const r = await apiCall('POST', '/api/v1/ai/sessions', undefined, token)
-    if (r.ok) {
-      const d = r.data?.data || r.data
-      const sid = d.id || d.sessionId
-      activeSessionRef.current = sid
-      setActiveSession(sid)
-      setMessages([{ role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' }])
-      loadSessions()
-    } else {
-      toast('세션 생성 실패', 'error')
-    }
-  }
 
   async function sendChat() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }

@@ -124,29 +124,6 @@ export default function AuctionDetailPage() {
     }
   }
 
-  async function loadAuction() {
-    setLoading(true)
-    const r = await apiCall('GET', `/api/v1/auctions/${id}`, undefined, token)
-    if (r.ok) {
-      const a: Auction = r.data?.data || r.data
-      setAuction(a)
-      const price = a.currentPrice || a.startPrice || 0
-      bidUnitRef.current = a.bidUnit || 1000
-      setCurrentPrice(price)
-      setBidAmount(price + bidUnitRef.current)
-      setDepositAmount(a.startPrice || 0)
-      if (a.status === 'PROGRESS') {
-        if (token) connectBid(id)
-        syncCurrentPrice(id)
-      }
-      if (a.status === 'WON' && token && userRole === 'BUYER') {
-        checkWinningOrder()
-      }
-    } else {
-      toast('경매를 불러올 수 없습니다.', 'error')
-    }
-  }
-
   const connectBid = useCallback(async (auctionId: string) => {
     // 이미 연결 시도 중이면 무시 (중복 구독 방지)
     if (connectingRef.current) return
@@ -233,6 +210,9 @@ export default function AuctionDetailPage() {
       if (a.status === 'PROGRESS') {
         if (token) connectBid(id)
         syncCurrentPrice(id)
+      }
+      if (a.status === 'WON' && token && userRole === 'BUYER') {
+        checkWinningOrder()
       }
     } else {
       toast('경매를 불러올 수 없습니다.', 'error')
