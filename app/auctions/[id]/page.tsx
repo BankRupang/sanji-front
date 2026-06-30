@@ -70,6 +70,7 @@ export default function AuctionDetailPage() {
   const [winningOrder, setWinningOrder] = useState<WinningOrder | null>(null)
   const [winningOpen, setWinningOpen] = useState(false)
   const [winningPaid, setWinningPaid] = useState(false)
+  const [winningPayAmount, setWinningPayAmount] = useState<number | null>(null)
 
   // Edit modal
   const [editOpen, setEditOpen] = useState(false)
@@ -120,8 +121,23 @@ export default function AuctionDetailPage() {
       if (order) {
         setWinningOrder(order)
         setWinningPaid(order.status === 'PAYMENT_SUCCESS')
+        if (order.orderId) fetchWinningPaymentAmount(order.orderId)
       }
     }
+  }
+
+  // 보증금이 제외된 실제 결제 금액(잔금)을 payment-service에서 조회
+  async function fetchWinningPaymentAmount(orderId: string): Promise<number | null> {
+    const r = await apiCall('GET', `/api/v1/payments/order/${orderId}`, undefined, token)
+    if (r.ok) {
+      const p = r.data?.data || r.data
+      const amt = p?.amount
+      if (typeof amt === 'number') {
+        setWinningPayAmount(amt)
+        return amt
+      }
+    }
+    return null
   }
 
   const connectBid = useCallback(async (auctionId: string) => {
@@ -405,10 +421,19 @@ export default function AuctionDetailPage() {
       return
     }
 
+    let amount = winningPayAmount
+    if (amount == null && order.orderId) {
+      amount = await fetchWinningPaymentAmount(order.orderId)
+    }
+    if (amount == null) {
+      toast('결제 금액을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.', 'error')
+      return
+    }
+
     try {
       const TossPayments = (window as unknown as { TossPayments: TossPaymentsFn }).TossPayments
       TossPayments('test_ck_24xLea5zVAJ0NLBRvPNlrQAMYNwW').requestPayment('카드', {
-        amount: order.amount,
+        amount,
         orderId: order.orderNumber,
         orderName: '낙찰금 결제',
         customerName: '구매자',
@@ -425,10 +450,15 @@ export default function AuctionDetailPage() {
     const r = await apiCall('POST', `/api/v1/payments/repay/${winningOrder.orderId}`, undefined, token)
     if (r.ok) {
       const repayOrder = r.data?.data || r.data
+      const amount = await fetchWinningPaymentAmount(winningOrder.orderId)
+      if (amount == null) {
+        toast('결제 금액을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.', 'error')
+        return
+      }
       try {
         const TossPayments = (window as unknown as { TossPayments: TossPaymentsFn }).TossPayments
         TossPayments('test_ck_24xLea5zVAJ0NLBRvPNlrQAMYNwW').requestPayment('카드', {
-          amount: repayOrder.amount || winningOrder.amount,
+          amount,
           orderId: repayOrder.orderNumber || winningOrder.orderNumber,
           orderName: '낙찰금 재결제',
           customerName: '구매자',
@@ -637,7 +667,7 @@ export default function AuctionDetailPage() {
                       style={{ width: '100%', marginBottom: '8px' }}
                       onClick={() => setWinningOpen(true)}
                     >
-                      🏆 낙찰금 결제하기 ({fmtNum(winningOrder?.amount || auction.finalPrice || 0)}원)
+                      🏆 낙찰금 결제하기 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
                     </button>
                     {winningOrder?.status === 'PAYMENT_FAIL' && (
                       <button
@@ -906,7 +936,7 @@ export default function AuctionDetailPage() {
             <div className="form-group" style={{ marginBottom: '20px' }}>
               <label>결제 금액</label>
               <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--g700)', padding: '8px 0' }}>
-                {fmtNum(winningOrder?.amount || auction.finalPrice || currentPrice || 0)}원
+                {fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? currentPrice ?? 0)}원
               </div>
             </div>
             {!winningOrder && (

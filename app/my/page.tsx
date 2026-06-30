@@ -86,7 +86,7 @@ export default function MyPage() {
       ...(dep.ok ? dep.data?.data?.content || [] : []),
       ...(win.ok ? win.data?.data?.content || [] : []),
     ]
-    setPayments(all.filter(o => o.status === 'PAID'))
+    setPayments(all.filter(o => o.status === 'PAYMENT_SUCCESS' || o.status === 'COMPLETED'))
     setPaymentsLoading(false)
   }
 
@@ -264,7 +264,7 @@ export default function MyPage() {
                       <td><span style={{ fontSize: '12px', fontWeight: 600, color: orderStatusColor(o.status || '') }}>{orderStatusLabel(o.status || '')}</span></td>
                       <td style={{ fontSize: '12px', color: 'var(--neu500)' }}>{o.paymentDueAt ? fmtDate(o.paymentDueAt) : '-'}</td>
                       <td>
-                        {o.status === 'FAILED' && (
+                        {o.status === 'PAYMENT_FAILED' && (
                           <button className="btn btn-sm btn-outline" onClick={() => doRepayOrder(String(o.orderId || o.id))}>재결제</button>
                         )}
                       </td>
