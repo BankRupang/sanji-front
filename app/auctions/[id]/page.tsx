@@ -669,7 +669,7 @@ export default function AuctionDetailPage() {
                     >
                       🏆 낙찰금 결제하기 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
                     </button>
-                    {winningOrder?.status === 'PAYMENT_FAIL' && (
+                    {winningOrder?.status === 'PAYMENT_FAILED' && (
                       <button
                         className="btn btn-accent btn-sm"
                         style={{ width: '100%' }}
