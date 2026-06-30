@@ -23,6 +23,11 @@ interface Notification {
   message?: string; title?: string; createdAt?: string;
 }
 
+// Toss Payments type shim
+type TossPaymentsFn = (clientKey: string) => {
+  requestPayment: (method: string, opts: Record<string, unknown>) => void
+}
+
 export default function MyPage() {
   const { token, userName, userRole, isLoaded } = useAuth()
   const toast = useToast()
@@ -131,8 +136,34 @@ export default function MyPage() {
   async function doRepayOrder(orderId: string) {
     if (!window.confirm('재결제를 진행하시겠습니까?')) return
     const r = await apiCall('POST', `/api/v1/payments/repay/${orderId}`, undefined, token)
-    if (r.ok) { toast('재결제가 완료되었습니다.', 'success'); loadOrders() }
-    else toast('재결제 실패: ' + (r.data?.message || ''), 'error')
+    console.log('[REPAY RESPONSE]', JSON.stringify(r.data))
+    if (!r.ok) { toast('재결제 실패: ' + (r.data?.message || ''), 'error'); return }
+
+    const repayOrder = r.data?.data || r.data
+
+    // 보증금이 제외된 실제 결제 금액(잔금)을 payment-service에서 조회
+    const amtRes = await apiCall('GET', `/api/v1/payments/order/${orderId}`, undefined, token)
+    const amount = amtRes.ok ? (amtRes.data?.data?.amount ?? amtRes.data?.amount) : null
+    if (typeof amount !== 'number') {
+      toast('결제 금액을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.', 'error')
+      return
+    }
+
+    const auctionId = orders.find(o => String(o.orderId || o.id) === orderId)?.auctionId
+
+    try {
+      const TossPayments = (window as unknown as { TossPayments: TossPaymentsFn }).TossPayments
+      TossPayments('test_ck_24xLea5zVAJ0NLBRvPNlrQAMYNwW').requestPayment('카드', {
+        amount,
+        orderId: repayOrder.tossOrderId,
+        orderName: '낙찰금 재결제',
+        customerName: '구매자',
+        successUrl: `${window.location.origin}/payments/success?auctionId=${auctionId || ''}&type=winning`,
+        failUrl: `${window.location.origin}/payments/fail?auctionId=${auctionId || ''}`,
+      })
+    } catch {
+      toast('Toss 결제창 초기화 실패', 'error')
+    }
   }
 
   if (!isLoaded) return <div className="loading"><div className="spinner" /></div>

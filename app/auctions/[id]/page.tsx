@@ -71,6 +71,7 @@ export default function AuctionDetailPage() {
   const [winningOpen, setWinningOpen] = useState(false)
   const [winningPaid, setWinningPaid] = useState(false)
   const [winningPayAmount, setWinningPayAmount] = useState<number | null>(null)
+  const [winningTossOrderId, setWinningTossOrderId] = useState<string | null>(null)
 
   // Edit modal
   const [editOpen, setEditOpen] = useState(false)
@@ -121,20 +122,22 @@ export default function AuctionDetailPage() {
       if (order) {
         setWinningOrder(order)
         setWinningPaid(order.status === 'PAYMENT_SUCCESS')
-        if (order.orderId) fetchWinningPaymentAmount(order.orderId)
+        if (order.orderId) fetchWinningPayment(order.orderId)
       }
     }
   }
 
-  // 보증금이 제외된 실제 결제 금액(잔금)을 payment-service에서 조회
-  async function fetchWinningPaymentAmount(orderId: string): Promise<number | null> {
+  // 보증금이 제외된 실제 결제 금액(잔금)과 토스 결제 추적용 tossOrderId를 payment-service에서 조회
+  async function fetchWinningPayment(orderId: string): Promise<{ amount: number; tossOrderId: string } | null> {
     const r = await apiCall('GET', `/api/v1/payments/order/${orderId}`, undefined, token)
     if (r.ok) {
       const p = r.data?.data || r.data
       const amt = p?.amount
-      if (typeof amt === 'number') {
+      const tossOrderId = p?.tossOrderId
+      if (typeof amt === 'number' && tossOrderId) {
         setWinningPayAmount(amt)
-        return amt
+        setWinningTossOrderId(tossOrderId)
+        return { amount: amt, tossOrderId }
       }
     }
     return null
@@ -423,7 +426,8 @@ export default function AuctionDetailPage() {
 
     let amount = winningPayAmount
     if (amount == null && order.orderId) {
-      amount = await fetchWinningPaymentAmount(order.orderId)
+      const res = await fetchWinningPayment(order.orderId)
+      amount = res?.amount ?? null
     }
     if (amount == null) {
       toast('결제 금액을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.', 'error')
@@ -449,17 +453,16 @@ export default function AuctionDetailPage() {
     if (!winningOrder?.orderId) { toast('주문 정보가 없습니다.', 'error'); return }
     const r = await apiCall('POST', `/api/v1/payments/repay/${winningOrder.orderId}`, undefined, token)
     if (r.ok) {
-      const repayOrder = r.data?.data || r.data
-      const amount = await fetchWinningPaymentAmount(winningOrder.orderId)
-      if (amount == null) {
+      const res = await fetchWinningPayment(winningOrder.orderId)
+      if (!res) {
         toast('결제 금액을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.', 'error')
         return
       }
       try {
         const TossPayments = (window as unknown as { TossPayments: TossPaymentsFn }).TossPayments
         TossPayments('test_ck_24xLea5zVAJ0NLBRvPNlrQAMYNwW').requestPayment('카드', {
-          amount,
-          orderId: repayOrder.orderNumber || winningOrder.orderNumber,
+          amount: res.amount,
+          orderId: res.tossOrderId,
           orderName: '낙찰금 재결제',
           customerName: '구매자',
           successUrl: `${window.location.origin}/payments/success?auctionId=${id}&type=winning`,

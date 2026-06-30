@@ -31,19 +31,17 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<AuthState>(() => {
-    if (typeof window === 'undefined') return { token: '', userId: '', userName: '', userRole: '' }
+  const [auth, setAuth] = useState<AuthState>({ token: '', userId: '', userName: '', userRole: '' })
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  useEffect(() => {
     const t = localStorage.getItem('sjk_tok') || ''
-    return {
+    setAuth({
       token: t,
       userId: localStorage.getItem('sjk_uid') || '',
       userRole: localStorage.getItem('sjk_role') || '',
       userName: localStorage.getItem('sjk_name') || '',
-    }
-  })
-  const [isLoaded, setIsLoaded] = useState(false)
-
-  useEffect(() => {
+    })
     setIsLoaded(true)
   }, [])
 
