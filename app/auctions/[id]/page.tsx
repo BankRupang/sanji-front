@@ -7,7 +7,10 @@ import { Client } from '@stomp/stompjs'
 import { apiCall, GW } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
-import { emojiFor, fmtNum, fmtDate, statusLabel, copyToClipboard } from '@/lib/utils'
+import { emojiFor, fmtNum, fmtDate, statusLabel, copyToClipboard, fmtCountdown } from '@/lib/utils'
+
+const AUCTION_DURATION_MS = 60 * 60 * 1000
+const BID_EXTENSION_MS = 60 * 1000
 
 interface Auction {
   id?: string
@@ -61,6 +64,11 @@ export default function AuctionDetailPage() {
   const [connected, setConnected] = useState(false)
   const [hasPaidDeposit, setHasPaidDeposit] = useState(false)
 
+  // 입찰 타이머: 서버가 endAt을 안 주므로 startAt+1시간을 기본 마감으로 잡고,
+  // 입찰 브로드캐스트가 올 때마다 "지금+1분"으로 로컬에서 리셋한다.
+  const [deadline, setDeadline] = useState<number | null>(null)
+  const [remainingMs, setRemainingMs] = useState(0)
+
   // Deposit modal
   const [depositOpen, setDepositOpen] = useState(false)
   const [depositAmount, setDepositAmount] = useState(0)
@@ -74,6 +82,7 @@ export default function AuctionDetailPage() {
   const [winningPaid, setWinningPaid] = useState(false)
   const [winningPayAmount, setWinningPayAmount] = useState<number | null>(null)
   const [, setWinningTossOrderId] = useState<string | null>(null)
+  const [winningPaymentStatus, setWinningPaymentStatus] = useState<string | null>(null)
 
   // Edit modal
   const [editOpen, setEditOpen] = useState(false)
@@ -121,6 +130,7 @@ export default function AuctionDetailPage() {
       const p = r.data?.data || r.data
       const amt = p?.amount
       const tossOrderId = p?.tossOrderId
+      if (p?.status) setWinningPaymentStatus(p.status)
       if (typeof amt === 'number' && tossOrderId) {
         setWinningPayAmount(amt)
         setWinningTossOrderId(tossOrderId)
@@ -139,7 +149,7 @@ export default function AuctionDetailPage() {
       )
       if (order) {
         setWinningOrder(order)
-        setWinningPaid(order.status === 'PAYMENT_SUCCESS')
+        setWinningPaid(order.status === 'COMPLETED')
         if (order.orderId) fetchWinningPayment(order.orderId)
       }
     }
@@ -192,6 +202,7 @@ export default function AuctionDetailPage() {
               setCurrentPrice(price)
               setBidAmount(price + bidUnitRef.current)
               setBidHistory(prev => [d, ...prev.slice(0, 19)])
+              setDeadline(Date.now() + BID_EXTENSION_MS)
             }
           } catch { /* ignore */ }
         })
@@ -232,6 +243,11 @@ export default function AuctionDetailPage() {
       if (a.status === 'PROGRESS') {
         if (token) connectBid(id)
         syncCurrentPrice(id)
+        if (a.startAt) {
+          setDeadline(prev => prev ?? new Date(a.startAt as string).getTime() + AUCTION_DURATION_MS)
+        }
+      } else {
+        setDeadline(null)
       }
       if (a.status === 'WON' && token && userRole === 'BUYER') {
         checkWinningOrder()
@@ -258,6 +274,14 @@ export default function AuctionDetailPage() {
 
     return () => { cancelled = true }
   }, [id, isLoaded, token, userRole, loadAuction, checkDepositStatus])
+
+  useEffect(() => {
+    if (!deadline) { setRemainingMs(0); return }
+    const tick = () => setRemainingMs(Math.max(0, deadline - Date.now()))
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [deadline])
 
   async function placeBid() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }
@@ -597,6 +621,34 @@ export default function AuctionDetailPage() {
               {isWon ? '🏆 낙찰 완료' : '실시간 입찰'}
             </div>
 
+            {isActive && deadline && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '10px',
+                  marginBottom: '12px',
+                  borderRadius: '10px',
+                  background: remainingMs <= 10000 ? 'var(--r50, #fef2f2)' : 'var(--g50)',
+                  border: `1px solid ${remainingMs <= 10000 ? 'var(--r200, #fecaca)' : 'var(--g200)'}`,
+                  fontSize: '13px',
+                  color: 'var(--neu600)',
+                }}
+              >
+                남은 시간{' '}
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '18px',
+                    fontWeight: 800,
+                    color: remainingMs <= 10000 ? 'var(--r600, #dc2626)' : 'var(--g700)',
+                    marginLeft: '4px',
+                  }}
+                >
+                  {fmtCountdown(remainingMs)}
+                </span>
+              </div>
+            )}
+
             <div className="current-price">
               <div className="cp-label">{isWon ? '최종 낙찰가' : '현재 최고가'}</div>
               <div className="cp-val">{fmtNum(isWon ? (auction.finalPrice || currentPrice) : currentPrice)}</div>
@@ -654,6 +706,28 @@ export default function AuctionDetailPage() {
                     <div style={{ fontWeight: 700, color: 'var(--g700)', fontSize: '15px' }}>낙찰금 결제 완료</div>
                     <div style={{ fontSize: '13px', color: 'var(--neu500)', marginTop: '4px' }}>거래가 성사되었습니다</div>
                   </div>
+                ) : (winningPaymentStatus === 'ABORTED' || winningPaymentStatus === 'EXPIRED') ? (
+                  <>
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'var(--y50, #fffbeb)',
+                      borderRadius: '10px',
+                      border: '1px solid var(--y200, #fde68a)',
+                      marginBottom: '12px',
+                      fontSize: '13px',
+                      color: 'var(--neu700)',
+                    }}>
+                      ⚠️ 최초 결제가 완료되지 않았습니다.<br />
+                      <span style={{ color: 'var(--neu500)', fontSize: '12px' }}>아래 재결제 시도 버튼으로 다시 결제해주세요.</span>
+                    </div>
+                    <button
+                      className="btn btn-accent"
+                      style={{ width: '100%' }}
+                      onClick={repayWinning}
+                    >
+                      🔁 재결제 시도 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
+                    </button>
+                  </>
                 ) : (
                   <>
                     <div style={{
@@ -670,20 +744,11 @@ export default function AuctionDetailPage() {
                     </div>
                     <button
                       className="btn btn-primary"
-                      style={{ width: '100%', marginBottom: '8px' }}
+                      style={{ width: '100%' }}
                       onClick={() => setWinningOpen(true)}
                     >
                       🏆 낙찰금 결제하기 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
                     </button>
-                    {winningOrder?.status === 'PAYMENT_FAILED' && (
-                      <button
-                        className="btn btn-accent btn-sm"
-                        style={{ width: '100%' }}
-                        onClick={repayWinning}
-                      >
-                        재결제 시도
-                      </button>
-                    )}
                   </>
                 )}
               </div>
