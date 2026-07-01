@@ -38,6 +38,8 @@ interface WinningOrder {
   auctionId?: string
   amount?: number
   status?: string
+  auction?: { id?: string }
+  auctionUuid?: string
 }
 
 // Toss Payments type shim
@@ -71,7 +73,7 @@ export default function AuctionDetailPage() {
   const [winningOpen, setWinningOpen] = useState(false)
   const [winningPaid, setWinningPaid] = useState(false)
   const [winningPayAmount, setWinningPayAmount] = useState<number | null>(null)
-  const [winningTossOrderId, setWinningTossOrderId] = useState<string | null>(null)
+  const [, setWinningTossOrderId] = useState<string | null>(null)
 
   // Edit modal
   const [editOpen, setEditOpen] = useState(false)
@@ -112,23 +114,8 @@ export default function AuctionDetailPage() {
     }
   }, [token, toast])
 
-  async function checkWinningOrder() {
-    const r = await apiCall('GET', '/api/v1/orders/winning/me?page=0&size=50', undefined, token)
-    if (r.ok) {
-      const orders: WinningOrder[] = r.data?.data?.content || []
-      const order = orders.find(o =>
-        o.auctionId === id || (o as any).auction?.id === id || (o as any).auctionUuid === id
-      )
-      if (order) {
-        setWinningOrder(order)
-        setWinningPaid(order.status === 'PAYMENT_SUCCESS')
-        if (order.orderId) fetchWinningPayment(order.orderId)
-      }
-    }
-  }
-
   // 보증금이 제외된 실제 결제 금액(잔금)과 토스 결제 추적용 tossOrderId를 payment-service에서 조회
-  async function fetchWinningPayment(orderId: string): Promise<{ amount: number; tossOrderId: string } | null> {
+  const fetchWinningPayment = useCallback(async (orderId: string): Promise<{ amount: number; tossOrderId: string } | null> => {
     const r = await apiCall('GET', `/api/v1/payments/order/${orderId}`, undefined, token)
     if (r.ok) {
       const p = r.data?.data || r.data
@@ -141,7 +128,22 @@ export default function AuctionDetailPage() {
       }
     }
     return null
-  }
+  }, [token])
+
+  const checkWinningOrder = useCallback(async () => {
+    const r = await apiCall('GET', '/api/v1/orders/winning/me?page=0&size=50', undefined, token)
+    if (r.ok) {
+      const orders: WinningOrder[] = r.data?.data?.content || []
+      const order = orders.find(o =>
+        o.auctionId === id || o.auction?.id === id || o.auctionUuid === id
+      )
+      if (order) {
+        setWinningOrder(order)
+        setWinningPaid(order.status === 'PAYMENT_SUCCESS')
+        if (order.orderId) fetchWinningPayment(order.orderId)
+      }
+    }
+  }, [token, id, fetchWinningPayment])
 
   const connectBid = useCallback(async (auctionId: string) => {
     // 이미 연결 시도 중이면 무시 (중복 구독 방지)
@@ -237,7 +239,7 @@ export default function AuctionDetailPage() {
       toast('경매를 불러올 수 없습니다.', 'error')
     }
     setLoading(false)
-  }, [id, token, toast, connectBid, syncCurrentPrice])
+  }, [id, token, toast, connectBid, syncCurrentPrice, checkWinningOrder, userRole])
 
   useEffect(() => {
     if (!token || userRole !== 'BUYER' || !id) return

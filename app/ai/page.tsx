@@ -37,6 +37,20 @@ export default function AiPage() {
     activeSessionRef.current = activeSession
   }, [activeSession])
 
+  const selectSession = useCallback(async (id: string) => {
+    setActiveSession(id)
+    activeSessionRef.current = id
+    const r = await apiCall('GET', `/api/v1/ai/sessions/${id}/messages`, undefined, token)
+    if (r.ok) {
+      const msgs: Message[] = r.data?.data || []
+      const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      setMessages([
+        { role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' },
+        ...msgs.map(m => ({ role: m.role === 'USER' ? 'user' : 'ai', text: m.content || '', time: now })),
+      ])
+    }
+  }, [token])
+
   const loadSessions = useCallback(async () => {
     const r = await apiCall('GET', '/api/v1/ai/sessions?page=0&size=20', undefined, token)
     if (r.ok) {
@@ -47,7 +61,7 @@ export default function AiPage() {
         selectSession(items[0].id || items[0].sessionId || '')
       }
     }
-  }, [token])
+  }, [token, selectSession])
 
   async function createSession() {
     if (!token) { toast('로그인이 필요합니다.', 'error'); return }
@@ -62,20 +76,6 @@ export default function AiPage() {
       setSessions(prev => [d, ...prev.filter(s => (s.id || s.sessionId) !== sid)])
     } else {
       toast('세션 생성 실패', 'error')
-    }
-  }
-
-  async function selectSession(id: string) {
-    setActiveSession(id)
-    activeSessionRef.current = id
-    const r = await apiCall('GET', `/api/v1/ai/sessions/${id}/messages`, undefined, token)
-    if (r.ok) {
-      const msgs: Message[] = r.data?.data || []
-      const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-      setMessages([
-        { role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' },
-        ...msgs.map(m => ({ role: m.role === 'USER' ? 'user' : 'ai', text: m.content || '', time: now })),
-      ])
     }
   }
 

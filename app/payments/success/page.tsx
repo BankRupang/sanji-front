@@ -48,7 +48,7 @@ function PaymentSuccessContent() {
     }
 
     confirm()
-  }, [isLoaded, paymentKey, orderId, backHref, amount, token, router, toast])
+  }, [isLoaded, paymentKey, orderId, backHref, amount, token, router, toast, isWinning])
 
   return (
     <div className="container" style={{ textAlign: 'center', paddingTop: '80px' }}>
