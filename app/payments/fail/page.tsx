@@ -16,7 +16,7 @@ function PaymentFailContent() {
   useEffect(() => {
     toast('결제 실패: ' + message, 'error')
     setTimeout(() => router.replace(backHref), 3000)
-  }, [])
+  }, [backHref, message, router, toast])
 
   return (
     <div className="container" style={{ textAlign: 'center', paddingTop: '80px' }}>

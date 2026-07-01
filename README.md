@@ -13,3 +13,11 @@ npm run dev
 ```
 
 Open [http://localhost:3005](http://localhost:3005) with your browser to see the result.
+
+## Environment Variables
+
+Make `.env.local` file:
+
+```env
+NEXT_PUBLIC_API_URL=
+```

@@ -73,14 +73,28 @@ export function copyToClipboard(text: string, label: string, toast: (msg: string
 
 export function orderStatusLabel(s: string): string {
   const m: Record<string, string> = {
-    PENDING: '결제대기', PAID: '결제완료', FAILED: '결제실패', CANCELLED: '취소됨', REFUNDED: '환불됨',
+    PENDING: '결제대기',
+    PAYMENT_SUCCESS: '결제완료',
+    PAYMENT_FAILED: '결제실패',
+    REFUNDED: '환불됨',
+    FORFEITED: '보증금몰수',
+    PENALTY_PENDING: '위약금대기',
+    EXPIRED: '기한만료',
+    COMPLETED: '거래완료',
   }
   return m[s] || s || '-'
 }
 
 export function orderStatusColor(s: string): string {
   const m: Record<string, string> = {
-    PENDING: '#f59e0b', PAID: '#16a34a', FAILED: '#dc2626', CANCELLED: '#6b7280', REFUNDED: '#3b82f6',
+    PENDING: '#f59e0b',
+    PAYMENT_SUCCESS: '#16a34a',
+    PAYMENT_FAILED: '#dc2626',
+    REFUNDED: '#3b82f6',
+    FORFEITED: '#dc2626',
+    PENALTY_PENDING: '#f59e0b',
+    EXPIRED: '#6b7280',
+    COMPLETED: '#16a34a',
   }
   return m[s] || '#6b7280'
 }

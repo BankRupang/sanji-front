@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,13 +20,17 @@ export default function AuctionsPage() {
 
   // Create auction modal
   const [createOpen, setCreateOpen] = useState(false)
-  const [caForm, setCaForm] = useState({ productId: '', startPrice: '', bidUnit: '', startAt: '' })
+  const [caForm, setCaForm] = useState({ productId: '', startPrice: '', bidUnit: '' })
+
+  // Time picker state
+  const [startDate, setStartDate] = useState('')
+  const [startHour, setStartHour] = useState('10')
+  const [startMinute, setStartMinute] = useState('00')
+  const [startAmpm, setStartAmpm] = useState<'AM' | 'PM'>('AM')
 
   const canCreate = userRole === 'SELLER' || userRole === 'MASTER'
 
-  useEffect(() => { if (isLoaded) loadAuctions() }, [status, page, isLoaded])
-
-  async function loadAuctions() {
+  const loadAuctions = useCallback(async () => {
     setLoading(true)
     const q = status ? `&status=${status}` : ''
     const r = await apiCall('GET', `/api/v1/auctions?page=${page}&size=12${q}`, undefined, token)
@@ -35,10 +39,26 @@ export default function AuctionsPage() {
       setTotalPages(r.data?.data?.totalPages || 1)
     }
     setLoading(false)
+  }, [status, page, token])
+
+  useEffect(() => { if (isLoaded) loadAuctions() }, [status, page, isLoaded, loadAuctions])
+
+  function buildStartAt(): string {
+    if (!startDate) return ''
+    let hour = parseInt(startHour)
+    if (startAmpm === 'AM') {
+      if (hour === 12) hour = 0
+    } else {
+      if (hour !== 12) hour += 12
+    }
+    const hh = String(hour).padStart(2, '0')
+    const mm = String(startMinute).padStart(2, '0')
+    return `${startDate}T${hh}:${mm}:00`
   }
 
   async function doCreateAuction() {
-    const { productId, startPrice, bidUnit, startAt } = caForm
+    const { productId, startPrice, bidUnit } = caForm
+    const startAt = buildStartAt()
     if (!productId || !startPrice || !bidUnit || !startAt) {
       toast('모든 항목을 입력하세요.', 'error'); return
     }
@@ -50,7 +70,7 @@ export default function AuctionsPage() {
     if (r.ok) {
       toast('경매가 등록되었습니다.', 'success')
       setCreateOpen(false)
-      setCaForm({ productId: '', startPrice: '', bidUnit: '', startAt: '' })
+      setCaForm({ productId: '', startPrice: '', bidUnit: '' })
       loadAuctions()
     } else {
       toast('등록 실패: ' + (r.data?.message || ''), 'error')
@@ -59,11 +79,23 @@ export default function AuctionsPage() {
 
   function openCreate() {
     if (!token) { router.push('/login'); return }
-    const kstOffset = 540 * 60 * 1000
-    const kstDate = new Date(Date.now() + kstOffset + 60 * 60000)
-    setCaForm(prev => ({ ...prev, startAt: kstDate.toISOString().slice(0, 16) }))
+    const now = new Date()
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    setStartDate(`${yyyy}-${mm}-${dd}`)
+    let h = now.getHours() + 1
+    const ampm: 'AM' | 'PM' = h < 12 || h === 24 ? 'AM' : 'PM'
+    if (h >= 24) h = 0
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+    setStartHour(String(h12))
+    setStartMinute('00')
+    setStartAmpm(ampm)
     setCreateOpen(true)
   }
+
+  const hours = Array.from({ length: 12 }, (_, i) => String(i + 1))
+  const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 
   return (
     <div className="container">
@@ -161,12 +193,43 @@ export default function AuctionsPage() {
               </div>
             </div>
             <div className="form-group">
-              <label>시작 시간 <span className="req">*</span></label>
+              <label>시작 날짜 <span className="req">*</span></label>
               <input
-                type="datetime-local"
-                value={caForm.startAt}
-                onChange={e => setCaForm(p => ({ ...p, startAt: e.target.value }))}
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
               />
+            </div>
+            <div className="form-group">
+              <label>시작 시간 <span className="req">*</span></label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <select
+                  value={startHour}
+                  onChange={e => setStartHour(e.target.value)}
+                  style={{ flex: 1 }}
+                >
+                  {hours.map(h => (
+                    <option key={h} value={h}>{h}시</option>
+                  ))}
+                </select>
+                <select
+                  value={startMinute}
+                  onChange={e => setStartMinute(e.target.value)}
+                  style={{ flex: 1 }}
+                >
+                  {minutes.map(m => (
+                    <option key={m} value={m}>{m}분</option>
+                  ))}
+                </select>
+                <select
+                  value={startAmpm}
+                  onChange={e => setStartAmpm(e.target.value as 'AM' | 'PM')}
+                  style={{ flex: 1 }}
+                >
+                  <option value="AM">오전</option>
+                  <option value="PM">오후</option>
+                </select>
+              </div>
             </div>
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={doCreateAuction}>
               경매 등록

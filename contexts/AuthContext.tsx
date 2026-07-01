@@ -36,10 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const t = localStorage.getItem('sjk_tok') || ''
-    const u = localStorage.getItem('sjk_uid') || ''
-    const r = localStorage.getItem('sjk_role') || ''
-    const n = localStorage.getItem('sjk_name') || ''
-    if (t) setAuth({ token: t, userId: u, userRole: r, userName: n })
+    setAuth({
+      token: t,
+      userId: localStorage.getItem('sjk_uid') || '',
+      userRole: localStorage.getItem('sjk_role') || '',
+      userName: localStorage.getItem('sjk_name') || '',
+    })
     setIsLoaded(true)
   }, [])
 

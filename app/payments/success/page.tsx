@@ -17,7 +17,9 @@ function PaymentSuccessContent() {
   const orderId = searchParams.get('orderId') || ''
   const amount = parseInt(searchParams.get('amount') || '0')
   const auctionId = searchParams.get('auctionId') || ''
+  const type = searchParams.get('type') || 'deposit' // 'deposit' | 'winning'
 
+  const isWinning = type === 'winning'
   const backHref = auctionId ? `/auctions/${auctionId}` : '/auctions'
 
   useEffect(() => {
@@ -36,7 +38,7 @@ function PaymentSuccessContent() {
 
       if (r.ok) {
         setStatus('success')
-        toast('보증금 결제가 성공적으로 완료되었습니다!', 'success')
+        toast(isWinning ? '낙찰금 결제가 완료되었습니다!' : '보증금 결제가 성공적으로 완료되었습니다!', 'success')
         setTimeout(() => router.replace(backHref), 1500)
       } else {
         setStatus('error')
@@ -46,7 +48,7 @@ function PaymentSuccessContent() {
     }
 
     confirm()
-  }, [isLoaded])
+  }, [isLoaded, paymentKey, orderId, backHref, amount, token, router, toast])
 
   return (
     <div className="container" style={{ textAlign: 'center', paddingTop: '80px' }}>
@@ -59,9 +61,12 @@ function PaymentSuccessContent() {
       )}
       {status === 'success' && (
         <>
-          <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>{isWinning ? '🏆' : '✅'}</div>
           <h2 style={{ marginBottom: '8px' }}>결제 완료</h2>
-          <p style={{ color: 'var(--neu500)' }}>보증금 결제가 완료되었습니다. 잠시 후 이동합니다...</p>
+          <p style={{ color: 'var(--neu500)' }}>
+            {isWinning ? '낙찰금 결제가 완료되었습니다. 거래가 성사됩니다.' : '보증금 결제가 완료되었습니다.'}{' '}
+            잠시 후 이동합니다...
+          </p>
         </>
       )}
       {status === 'error' && (
