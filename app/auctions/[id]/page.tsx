@@ -118,6 +118,7 @@ export default function AuctionDetailPage() {
 
     const wsUrl = GW.replace(/^http/, 'ws') + '/ws/bid-native'
     const connectHeaders: Record<string, string> = { 'X-User-Id': userId }
+    if (userRole) connectHeaders['X-User-Role'] = userRole
     if (token) connectHeaders['Authorization'] = `Bearer ${token}`
 
     const client = new Client({
