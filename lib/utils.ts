@@ -105,3 +105,10 @@ export function orderStatusColor(s: string): string {
 export function orderTypeLabel(t: string): string {
   return t === 'DEPOSIT' ? '보증금' : t === 'WINNING' ? '낙찰금' : t || '-'
 }
+
+export function fmtCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
