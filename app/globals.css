@@ -25,6 +25,23 @@
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
 }
 
+img.emoji {
+  height: 1em;
+  width: 1em;
+  margin: 0 0.05em 0 0.1em;
+  vertical-align: -0.1em;
+  display: inline-block;
+}
+
+/* 단독 배치 이모지 — 마진 제거, flex 중앙 정렬 유지 */
+.hero-img img.emoji,
+.card-thumb img.emoji,
+.empty-icon img.emoji,
+.product-emoji img.emoji {
+  margin: 0;
+  vertical-align: unset;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

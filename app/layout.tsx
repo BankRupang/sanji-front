@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import Header from '@/components/Header'
 import Toast from '@/components/Toast'
+import TwemojiProvider from '@/components/TwemojiProvider'
 
 export const metadata: Metadata = {
   title: '산지직경 — 산지에서 직접 경매로',
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>
           <ToastProvider>
+            <TwemojiProvider />
             <Header />
             {children}
             <Toast />
