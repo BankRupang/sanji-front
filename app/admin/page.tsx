@@ -26,7 +26,7 @@ interface AuctionItem {
 }
 
 interface AiDoc {
-  source?: string; fileName?: string; createdAt?: string;
+  source?: string; title?: string; createdAt?: string;
 }
 
 export default function AdminPage() {
@@ -183,6 +183,17 @@ export default function AdminPage() {
     const res = await fetch(GW + '/api/v1/admin/ai/documents', { method: 'POST', headers, body: fd })
     if (res.ok) { toast('문서가 등록되었습니다.', 'success'); setDocSrc(''); loadAiDocs() }
     else toast('등록 실패', 'error')
+  }
+
+  async function reembedAiDoc(src: string, file: File) {
+    if (!window.confirm(`'${src}' 문서를 새 파일로 재임베딩하시겠습니까?`)) return
+    const fd = new FormData()
+    fd.append('file', file)
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(GW + `/api/v1/admin/ai/documents/${encodeURIComponent(src)}`, { method: 'PUT', headers, body: fd })
+    if (res.ok) { toast('재임베딩되었습니다.', 'success'); loadAiDocs() }
+    else toast('재임베딩 실패', 'error')
   }
 
   async function deleteAiDoc(src: string) {
@@ -371,14 +382,30 @@ export default function AdminPage() {
           {aiDocsLoading ? <div className="loading"><div className="spinner" /></div> : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>source</th><th>파일명</th><th>등록일</th><th>삭제</th></tr></thead>
+                <thead><tr><th>source</th><th>파일명</th><th>등록일</th><th>작업</th></tr></thead>
                 <tbody>
                   {aiDocs.length > 0 ? aiDocs.map(d => (
                     <tr key={d.source}>
                       <td>{d.source || '-'}</td>
-                      <td>{d.fileName || '-'}</td>
+                      <td>{d.title || '-'}</td>
                       <td>{fmtDate(d.createdAt || '')}</td>
-                      <td><button className="btn btn-danger btn-sm" onClick={() => deleteAiDoc(d.source || '')}>삭제</button></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                            재임베딩
+                            <input
+                              type="file"
+                              style={{ display: 'none' }}
+                              onChange={e => {
+                                const file = e.target.files?.[0]
+                                if (file) reembedAiDoc(d.source || '', file)
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                          <button className="btn btn-danger btn-sm" onClick={() => deleteAiDoc(d.source || '')}>삭제</button>
+                        </div>
+                      </td>
                     </tr>
                   )) : <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--neu500)' }}>등록된 문서 없음</td></tr>}
                 </tbody>
