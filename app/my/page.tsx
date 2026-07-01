@@ -295,7 +295,7 @@ export default function MyPage() {
                       <td><span style={{ fontSize: '12px', fontWeight: 600, color: orderStatusColor(o.status || '') }}>{orderStatusLabel(o.status || '')}</span></td>
                       <td style={{ fontSize: '12px', color: 'var(--neu500)' }}>{o.paymentDueAt ? fmtDate(o.paymentDueAt) : '-'}</td>
                       <td>
-                        {o.status === 'PAYMENT_FAILED' && (
+                        {o.status === 'PENALTY_PENDING' && (
                           <button className="btn btn-sm btn-outline" onClick={() => doRepayOrder(String(o.orderId || o.id))}>재결제</button>
                         )}
                       </td>
