@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { emojiFor, bgClass, statusLabel, fmtNum, fmtDate } from '@/lib/utils'
+import { categoryFor, bgClass, statusLabel, fmtNum, fmtDate } from '@/lib/utils'
 
 export interface AuctionItem {
   id?: string
@@ -15,16 +15,24 @@ export interface AuctionItem {
   endAt?: string
 }
 
+const CATEGORY_LABEL: Record<string, { label: string; cls: string }> = {
+  livestock: { label: '축산', cls: 'cat-red' },
+  seafood:   { label: '수산', cls: 'cat-blue' },
+  fruit:     { label: '청과', cls: 'cat-yellow' },
+  farm:      { label: '농산', cls: 'cat-green' },
+}
+
 export default function AuctionCard({ a }: { a: AuctionItem }) {
   const id = a.id || a.auctionId
   const name = a.product?.name || a.productName || a.title || ''
-  const em = emojiFor(name)
+  const cat = categoryFor(name)
   const bc = bgClass(name || 'a')
+  const { label, cls } = CATEGORY_LABEL[cat]
 
   return (
     <Link href={`/auctions/${id}`} className="auction-card">
       <div className={`card-thumb ${bc}`}>
-        {em}
+        <span className={`card-category ${cls}`}>{label}</span>
         <span className={`card-status status-${a.status || 'READY'}`}>
           {statusLabel(a.status || '')}
         </span>

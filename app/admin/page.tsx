@@ -45,6 +45,8 @@ export default function AdminPage() {
   const [userDetailOpen, setUserDetailOpen] = useState(false)
   const [userIdInput, setUserIdInput] = useState('')
   const [userIdSearching, setUserIdSearching] = useState(false)
+  const [userPage, setUserPage] = useState(0)
+  const [userTotalPages, setUserTotalPages] = useState(1)
 
   // Products
   const [products, setProducts] = useState<Product[]>([])
@@ -62,15 +64,17 @@ export default function AdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Users ────────────────────────────────────────────────────────────────
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (page = 0) => {
     setUsersLoading(true)
-    const q = new URLSearchParams({ page: '0', size: '50' })
+    const q = new URLSearchParams({ page: String(page), size: '20' })
     if (roleFilter) q.set('role', roleFilter)
     if (statusFilter) q.set('status', statusFilter)
     const r = await apiCall('GET', `/api/v1/users/all?${q}`, undefined, token)
     if (r.ok) {
-      const list = r.data?.data?.content || []
-      setUsers(list)
+      const data = r.data?.data
+      setUsers(data?.content || [])
+      setUserTotalPages(data?.totalPages || 1)
+      setUserPage(page)
     } else toast('사용자 목록 불러오기 실패. 관리자 권한을 확인하세요.', 'error')
     setUsersLoading(false)
   }, [token, roleFilter, statusFilter, toast])
@@ -246,7 +250,7 @@ export default function AdminPage() {
               <option value="">전체</option>
               <option>ACTIVE</option><option>SUSPENDED</option><option>DELETED</option>
             </select>
-            <button className="btn btn-primary btn-sm" onClick={loadUsers}>검색</button>
+            <button className="btn btn-primary btn-sm" onClick={() => loadUsers(0)}>검색</button>
           </div>
           <div className="filter-bar" style={{ marginBottom: '16px' }}>
             <span className="filter-label">UUID 직접 조회</span>
@@ -300,6 +304,19 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {userTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '16px' }}>
+              <button className="btn btn-outline btn-sm" onClick={() => loadUsers(0)} disabled={userPage === 0}>«</button>
+              <button className="btn btn-outline btn-sm" onClick={() => loadUsers(userPage - 1)} disabled={userPage === 0}>‹</button>
+              {Array.from({ length: userTotalPages }, (_, i) => (
+                <button key={i} className={`btn btn-sm ${userPage === i ? 'btn-primary' : 'btn-outline'}`} onClick={() => loadUsers(i)}>
+                  {i + 1}
+                </button>
+              ))}
+              <button className="btn btn-outline btn-sm" onClick={() => loadUsers(userPage + 1)} disabled={userPage === userTotalPages - 1}>›</button>
+              <button className="btn btn-outline btn-sm" onClick={() => loadUsers(userTotalPages - 1)} disabled={userPage === userTotalPages - 1}>»</button>
             </div>
           )}
         </>

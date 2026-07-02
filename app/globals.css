@@ -151,9 +151,28 @@ input, select, textarea { font-family: inherit; }
   height: 160px; display: flex; align-items: center; justify-content: center;
   font-size: 56px; position: relative;
 }
-.card-thumb.green  { background: var(--g100); }
-.card-thumb.yellow { background: #fffbeb; }
-.card-thumb.purple { background: #f5f3ff; }
+.card-thumb.green  { background: #c6e8c6; }   /* 농산 */
+.card-thumb.yellow { background: #f9e4a8; }   /* 청과 */
+.card-thumb.purple { background: #ddd6fe; }   /* 기타 */
+.card-thumb.red    { background: #ffc4c4; }   /* 축산 */
+.card-thumb.blue   { background: #b3d4f5; }   /* 수산 */
+/* 사선 패턴 */
+.card-thumb::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(
+    -45deg, transparent, transparent 10px, rgba(255,255,255,0.3) 10px, rgba(255,255,255,0.3) 20px
+  );
+}
+/* 카테고리 뱃지 */
+.card-category {
+  position: absolute; top: 10px; left: 10px; z-index: 1;
+  padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(4px);
+}
+.cat-red    { color: #dc2626; }
+.cat-green  { color: #15803d; }
+.cat-blue   { color: #1d4ed8; }
+.cat-yellow { color: #b45309; }
 .card-status {
   position: absolute; top: 10px; right: 10px;
   padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;

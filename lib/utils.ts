@@ -12,28 +12,43 @@ export function fmtDate(s: string | undefined | null): string {
   })
 }
 
+const LIVESTOCK_KW = ['소','돼지','닭','오리','한우','삼겹','갈비','육우','소고기','돼지고기','닭고기','계란','달걀','우유','양고기','흑돼지','토종닭','오리고기']
+const SEAFOOD_KW   = ['고등어','갈치','오징어','낙지','문어','새우','게','굴','전복','조개','연어','참치','광어','우럭','꽃게','멸치','미역','다시마','가자미','도미','방어','명태','대구','바지락','홍합','가리비','해삼','성게','김','수산']
+const FRUIT_KW     = ['사과','배','포도','딸기','수박','참외','복숭아','망고','바나나','오렌지','키위','감귤','레몬','블루베리','체리','자두','살구','무화과','멜론','파인애플','귤','유자','석류','감','대추','밤','호두','잣','코코넛']
+
+export type ProductCategory = 'livestock' | 'seafood' | 'fruit' | 'farm'
+
+export function categoryFor(name: string): ProductCategory {
+  const n = name || ''
+  if (LIVESTOCK_KW.some(k => n.includes(k))) return 'livestock'
+  if (SEAFOOD_KW.some(k => n.includes(k))) return 'seafood'
+  if (FRUIT_KW.some(k => n.includes(k))) return 'fruit'
+  return 'farm'
+}
+
 const emojiMap: Record<string, string> = {
-  사과: '🍎', 배: '🍐', 포도: '🍇', 딸기: '🍓', 감: '🫐',
-  수박: '🍉', 참외: '🍈', 복숭아: '🍑', 망고: '🥭', 바나나: '🍌',
-  오렌지: '🍊', 키위: '🥝', 토마토: '🍅', 당근: '🥕', 양파: '🧅',
-  마늘: '🧄', 고구마: '🍠', 가지: '🍆', 배추: '🥬', 양상추: '🥦',
-  호박: '🎃', 오이: '🥒', 파프리카: '🫑', 콩: '🫘', 쌀: '🌾', 장미: '🌹',
-  블루베리: '🫐', 코코넛: '🥥', 레몬: '🍋', 라임: '🍋‍🟩', 파인애플: '🍍',
-  체리: '🍒', 올리브: '🫒', 멜론: '🍈', 감자: '🥔', 옥수수: '🌽',
-  브로콜리: '🥦', 땅콩: '🥜', 밤: '🌰', 버섯: '🍄‍🟫'
+  사과: '🍎', 배: '🍐', 포도: '🍇', 딸기: '🍓', 수박: '🍉', 참외: '🍈',
+  복숭아: '🍑', 망고: '🥭', 바나나: '🍌', 오렌지: '🍊', 키위: '🥝', 레몬: '🍋',
+  블루베리: '🫐', 체리: '🍒', 파인애플: '🍍', 멜론: '🍈', 귤: '🍊', 감: '🍊', 밤: '🌰',
+  토마토: '🍅', 당근: '🥕', 양파: '🧅', 마늘: '🧄', 고구마: '🍠', 가지: '🍆',
+  배추: '🥬', 양상추: '🥦', 호박: '🎃', 오이: '🥒', 파프리카: '🫑', 콩: '🫘',
+  쌀: '🌾', 고추: '🌶️', 감자: '🥔', 버섯: '🍄', 옥수수: '🌽', 브로콜리: '🥦',
+  고등어: '🐟', 갈치: '🐟', 오징어: '🦑', 낙지: '🐙', 문어: '🐙', 새우: '🦐',
+  게: '🦀', 굴: '🦪', 전복: '🐚', 연어: '🐟', 꽃게: '🦀', 미역: '🌿', 김: '🌿',
+  한우: '🥩', 소고기: '🥩', 돼지고기: '🥩', 삼겹: '🥓', 닭고기: '🍗', 달걀: '🥚',
+  계란: '🥚', 우유: '🥛',
 }
 
 export function emojiFor(name: string): string {
   for (const k in emojiMap) {
     if ((name || '').includes(k)) return emojiMap[k]
   }
-  const defaults = ['🌾', '🍋', '🥦', '🫘', '🌿', '🌱']
-  return defaults[Math.abs((name || 'a').charCodeAt(0)) % 6]
+  const cat = categoryFor(name)
+  return { livestock: '🥩', seafood: '🐟', fruit: '🍎', farm: '🌾' }[cat]
 }
 
 export function bgClass(name: string): string {
-  const cls = ['green', 'yellow', 'purple']
-  return cls[Math.abs((name || 'a').charCodeAt(0)) % 3]
+  return { livestock: 'red', seafood: 'blue', fruit: 'yellow', farm: 'green' }[categoryFor(name)]
 }
 
 export function statusLabel(s: string): string {
