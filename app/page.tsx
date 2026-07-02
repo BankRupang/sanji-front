@@ -6,10 +6,20 @@ import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import AuctionCard, { type AuctionItem } from '@/components/AuctionCard'
 
+const HERO_IMAGES = [
+  'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+  'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+  'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+  'https://images.unsplash.com/photo-1444858291040-58f756a3bdd6?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+  'https://images.unsplash.com/photo-1560493676-04071c5f467b?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+  'https://images.unsplash.com/photo-1464226184884-fa280b87c399?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb',
+]
+
 export default function HomePage() {
   const { token } = useAuth()
   const [auctions, setAuctions] = useState<AuctionItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [heroIndex, setHeroIndex] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -19,6 +29,13 @@ export default function HomePage() {
     }
     load()
   }, [token])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroIndex(i => (i + 1) % HERO_IMAGES.length)
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <>
@@ -33,7 +50,17 @@ export default function HomePage() {
               <span className="hero-badge">📦 산지 직송</span>
             </div>
           </div>
-          <div className="hero-img">🌾</div>
+        </div>
+        <div className="hero-img">
+          {HERO_IMAGES.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              className="hero-img-slide"
+              style={{ opacity: i === heroIndex ? 1 : 0, zIndex: i === heroIndex ? 1 : 0 }}
+            />
+          ))}
         </div>
       </div>
 

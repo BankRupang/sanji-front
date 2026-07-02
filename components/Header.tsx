@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -30,7 +31,10 @@ export default function Header() {
   return (
     <header className="hdr">
       <div className="hdr-inner">
-        <Link href="/" className="logo">산지<span>직경</span></Link>
+        <Link href="/" className="logo">
+          <Image src="/icon.webp" alt="산지직경 아이콘" width={32} height={32} />
+          산지<span>직경</span>
+        </Link>
         <nav className="nav">
           {navLinks.map(({ href, label }) => (
             <Link
