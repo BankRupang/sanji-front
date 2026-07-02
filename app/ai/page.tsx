@@ -83,6 +83,29 @@ export default function AiPage() {
     if (token) loadSessions()
   }, [token, loadSessions])
 
+  async function deleteSession(e: React.MouseEvent, id: string) {
+    e.stopPropagation()
+    if (!token || !id) return
+    if (!window.confirm('이 대화를 삭제하시겠습니까?')) return
+
+    const r = await apiCall('DELETE', `/api/v1/ai/sessions/${id}`, undefined, token)
+    if (!r.ok) { toast('세션 삭제 실패', 'error'); return }
+
+    setSessions(prev => {
+      const remaining = prev.filter(s => (s.id || s.sessionId) !== id)
+      if (activeSessionRef.current === id) {
+        if (remaining.length > 0) {
+          selectSession(remaining[0].id || remaining[0].sessionId || '')
+        } else {
+          setActiveSession(null)
+          activeSessionRef.current = null
+          setMessages([{ role: 'ai', text: '안녕하세요! 산지직경 AI 상담사입니다. 🌾\n농산물 경매에 대해 궁금한 점을 물어보세요.', time: '지금' }])
+        }
+      }
+      return remaining
+    })
+  }
+
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight
   }, [messages])
@@ -158,7 +181,15 @@ export default function AiPage() {
                   className={`chat-session-item${activeSession === sid ? ' active' : ''}`}
                   onClick={() => selectSession(sid)}
                 >
-                  💬 세션 {fmtDate(s.createdAt || '')}
+                  <span>💬 세션 {fmtDate(s.createdAt || '')}</span>
+                  <button
+                    className="chat-session-delete"
+                    onClick={e => deleteSession(e, sid)}
+                    aria-label="세션 삭제"
+                    title="세션 삭제"
+                  >
+                    ✕
+                  </button>
                 </div>
               )
             })
