@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -53,10 +54,12 @@ export default function HomePage() {
         </div>
         <div className="hero-img">
           {HERO_IMAGES.map((src, i) => (
-            <img
+            <Image
               key={src}
               src={src}
               alt=""
+              fill
+              priority={i === 0}
               className="hero-img-slide"
               style={{ opacity: i === heroIndex ? 1 : 0, zIndex: i === heroIndex ? 1 : 0 }}
             />
