@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { apiCall } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -210,12 +212,17 @@ export default function AiPage() {
               <div
                 className="msg-bubble"
                 style={{
-                  whiteSpace: 'pre-wrap',
                   opacity: m.text === '...' ? 0.5 : 1,
                   fontStyle: m.text === '...' ? 'italic' : 'normal',
                 }}
               >
-                {m.text}
+                {m.role === 'ai' && m.text !== '...' ? (
+                  <div className="msg-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{m.text}</span>
+                )}
               </div>
               <div className="msg-time">{m.time}</div>
             </div>
