@@ -237,11 +237,10 @@ export default function MyPage() {
               {bizEditMode && <button className="btn btn-outline btn-sm" onClick={() => setBizEditMode(false)}>취소</button>}
             </div>
             {!bizEditMode ? (
-              <div className="form-group"><label>사업자번호</label><div style={{ padding: '8px 0', fontWeight: 600 }}>{userInfo.businessNumber || '-'}</div></div>
+              <div className="form-group"><div style={{ padding: '8px 0', fontWeight: 600 }}>{userInfo.businessNumber || '-'}</div></div>
             ) : (
               <>
                 <div className="form-group">
-                  <label>사업자번호</label>
                   <input value={bizForm.businessNumber} onChange={e => setBizForm({ businessNumber: e.target.value })} placeholder="123-45-67890" />
                   <div className="form-hint">형식: 000-00-00000</div>
                 </div>
