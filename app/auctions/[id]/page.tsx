@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Client } from '@stomp/stompjs'
@@ -694,7 +694,7 @@ export default function AuctionDetailPage() {
             ) : isWon && isWinner ? (
               <div style={{ marginBottom: '14px' }}>
                 {winningPaid ? (
-                  <div style={{
+                  <div key="paid" style={{
                     textAlign: 'center',
                     padding: '16px',
                     background: 'var(--g50)',
@@ -707,7 +707,7 @@ export default function AuctionDetailPage() {
                     <div style={{ fontSize: '13px', color: 'var(--neu500)', marginTop: '4px' }}>거래가 성사되었습니다</div>
                   </div>
                 ) : (winningPaymentStatus === 'ABORTED' || winningPaymentStatus === 'EXPIRED') ? (
-                  <>
+                  <Fragment key="retry">
                     <div style={{
                       padding: '12px 16px',
                       background: 'var(--y50, #fffbeb)',
@@ -727,9 +727,9 @@ export default function AuctionDetailPage() {
                     >
                       🔁 재결제 시도 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
                     </button>
-                  </>
+                  </Fragment>
                 ) : (
-                  <>
+                  <Fragment key="default">
                     <div style={{
                       padding: '12px 16px',
                       background: 'var(--y50, #fffbeb)',
@@ -749,7 +749,7 @@ export default function AuctionDetailPage() {
                     >
                       🏆 낙찰금 결제하기 ({fmtNum(winningPayAmount ?? winningOrder?.amount ?? auction.finalPrice ?? 0)}원)
                     </button>
-                  </>
+                  </Fragment>
                 )}
               </div>
             ) : !isActive && !isWon ? (
