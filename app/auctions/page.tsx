@@ -112,7 +112,7 @@ export default function AuctionsPage() {
           <option value="WON">낙찰</option>
           <option value="SUCCESS">거래완료</option>
           <option value="FAIL">유찰</option>
-          <option value="CANCELLED">취소</option>
+          <option value="CANCEL">취소</option>
         </select>
         {canCreate && (
           <button

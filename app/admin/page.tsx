@@ -22,7 +22,7 @@ interface Product {
 interface AuctionItem {
   id?: string; auctionId?: string; status?: string;
   product?: { name?: string }; productName?: string;
-  startPrice?: number; startAt?: string;
+  startPrice?: number; startAt?: string; endAt?: string;
 }
 
 interface AiDoc {
@@ -53,6 +53,7 @@ export default function AdminPage() {
   // Auctions
   const [auctions, setAuctions] = useState<AuctionItem[]>([])
   const [auctionsLoading, setAuctionsLoading] = useState(false)
+  const [closeTarget, setCloseTarget] = useState<AuctionItem | null>(null)
 
   // AI Docs
   const [aiDocs, setAiDocs] = useState<AiDoc[]>([])
@@ -149,10 +150,13 @@ export default function AdminPage() {
     else toast('실패: ' + (r.data?.message || ''), 'error')
   }
 
-  async function closeAuction(id: string) {
-    if (!window.confirm('경매를 강제 마감하시겠습니까?')) return
-    const r = await apiCall('POST', `/api/v1/auctions/${id}/close`, {}, token)
-    if (r.ok) { toast('경매가 마감되었습니다.', 'success'); loadAdminAuctions() }
+  async function closeAuction(id: string, forceFail: boolean) {
+    const r = await apiCall('POST', `/api/v1/auctions/${id}/close`, { forceFail }, token)
+    if (r.ok) {
+      toast(forceFail ? '경매가 유찰 처리되었습니다.' : '경매가 낙찰 처리되었습니다.', 'success')
+      setCloseTarget(null)
+      loadAdminAuctions()
+    }
     else toast('실패: ' + (r.data?.message || ''), 'error')
   }
 
@@ -330,7 +334,7 @@ export default function AdminPage() {
         auctionsLoading ? <div className="loading"><div className="spinner" /></div> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>상품명</th><th>상태</th><th>시작가</th><th>시작 시간</th><th>제어</th></tr></thead>
+              <thead><tr><th>상품명</th><th>상태</th><th>시작가</th><th>시작 시간</th><th>마감 시간</th><th>제어</th></tr></thead>
               <tbody>
                 {auctions.map(a => {
                   const aid = String(a.id || a.auctionId)
@@ -348,11 +352,12 @@ export default function AdminPage() {
                       </td>
                       <td>{fmtNum(a.startPrice || 0)}원</td>
                       <td>{fmtDate(a.startAt || '')}</td>
+                      <td>{fmtDate(a.endAt || '')}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '5px' }}>
                           {a.status === 'READY' && <button className="btn btn-primary btn-sm" onClick={() => startAuction(aid)}>시작</button>}
-                          {a.status === 'PROGRESS' && <button className="btn btn-accent btn-sm" onClick={() => closeAuction(aid)}>마감</button>}
-                          {(a.status === 'READY' || a.status === 'PROGRESS') && <button className="btn btn-danger btn-sm" onClick={() => cancelAuction(aid)}>취소</button>}
+                          {a.status === 'PROGRESS' && <button className="btn btn-accent btn-sm" onClick={() => setCloseTarget(a)}>조기 마감</button>}
+                          {a.status === 'READY' && <button className="btn btn-danger btn-sm" onClick={() => cancelAuction(aid)}>취소</button>}
                         </div>
                       </td>
                     </tr>
@@ -457,6 +462,37 @@ export default function AdminPage() {
                 )}
                 <button className="btn btn-outline" onClick={() => setUserDetailOpen(false)}>닫기</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Auction Modal */}
+      {closeTarget && (
+        <div className="modal-backdrop open" onClick={e => e.target === e.currentTarget && setCloseTarget(null)}>
+          <div className="modal" style={{ maxWidth: '440px' }}>
+            <div className="modal-title">
+              조기 마감
+              <button className="modal-close" onClick={() => setCloseTarget(null)}>×</button>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--neu500)', marginBottom: '20px' }}>
+              현재 최고가 입찰자를 자동 낙찰 처리하거나, 입찰 여부와 관계없이 강제 유찰 처리합니다.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => closeAuction(String(closeTarget.id || closeTarget.auctionId), false)}
+              >
+                최고가 조기 낙찰
+              </button>
+              <button
+                className="btn btn-danger"
+                style={{ flex: 1 }}
+                onClick={() => closeAuction(String(closeTarget.id || closeTarget.auctionId), true)}
+              >
+                강제 유찰 종료
+              </button>
             </div>
           </div>
         </div>
