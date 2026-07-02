@@ -44,6 +44,7 @@ export function statusLabel(s: string): string {
     WON: '낙찰',
     SUCCESS: '거래완료',
     FAIL: '유찰',
+    CANCEL: '취소',
     CANCELLED: '취소',
   }
   return labels[s] || s || '-'

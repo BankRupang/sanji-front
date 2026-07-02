@@ -153,6 +153,7 @@ input, select, textarea { font-family: inherit; }
 .status-WON            { background: #dbeafe; color: #1d4ed8; }
 .status-SUCCESS        { background: #d1fae5; color: #065f46; }
 .status-FAIL           { background: #f3f4f6; color: #6b7280; }
+.status-CANCEL         { background: var(--redL); color: var(--red); }
 .status-CANCELLED      { background: var(--redL); color: var(--red); }
 .card-body { padding: 16px; }
 .card-name {

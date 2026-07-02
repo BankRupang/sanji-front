@@ -9,7 +9,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { emojiFor, fmtNum, fmtDate, statusLabel, copyToClipboard, fmtCountdown } from '@/lib/utils'
 
-const AUCTION_DURATION_MS = 60 * 60 * 1000
 const BID_EXTENSION_MS = 60 * 1000
 
 interface Auction {
@@ -24,6 +23,7 @@ interface Auction {
   finalPrice?: number
   bidUnit?: number
   startAt?: string
+  endAt?: string
   sellerId?: string
   winnerId?: string
 }
@@ -64,7 +64,6 @@ export default function AuctionDetailPage() {
   const [connected, setConnected] = useState(false)
   const [hasPaidDeposit, setHasPaidDeposit] = useState(false)
 
-  // 입찰 타이머: 서버가 endAt을 안 주므로 startAt+1시간을 기본 마감으로 잡고,
   // 입찰 브로드캐스트가 올 때마다 "지금+1분"으로 로컬에서 리셋한다.
   const [deadline, setDeadline] = useState<number | null>(null)
   const [remainingMs, setRemainingMs] = useState(0)
@@ -94,7 +93,6 @@ export default function AuctionDetailPage() {
 
   // Close auction modal
   const [closeOpen, setCloseOpen] = useState(false)
-  const [closeForm, setCloseForm] = useState({ winnerId: '', finalPrice: '' })
 
   const stompRef = useRef<Client | null>(null)
   const connectingRef = useRef(false)
@@ -219,7 +217,7 @@ export default function AuctionDetailPage() {
       },
     })
     client.activate()
-  }, [userId, token, toast, syncCurrentPrice])
+  }, [userId, userRole, token, toast, syncCurrentPrice])
 
   const checkDepositStatus = useCallback(async () => {
     const r = await apiCall('GET', '/api/v1/orders/deposit/me?page=0&size=50', undefined, token)
@@ -243,8 +241,8 @@ export default function AuctionDetailPage() {
       if (a.status === 'PROGRESS') {
         if (token) connectBid(id)
         syncCurrentPrice(id)
-        if (a.startAt) {
-          setDeadline(prev => prev ?? new Date(a.startAt as string).getTime() + AUCTION_DURATION_MS)
+        if (a.endAt) {
+          setDeadline(prev => prev ?? new Date(a.endAt as string).getTime())
         }
       } else {
         setDeadline(null)
@@ -301,23 +299,14 @@ export default function AuctionDetailPage() {
   }
 
   function openCloseModal() {
-    setCloseForm({ winnerId: '', finalPrice: '' })
     setCloseOpen(true)
   }
 
-  async function doCloseAuction(withWinner: boolean) {
-    if (withWinner) {
-      if (!closeForm.winnerId.trim()) { toast('낙찰자 ID를 입력하세요.', 'error'); return }
-      if (!closeForm.finalPrice || parseInt(closeForm.finalPrice) < 1) { toast('낙찰가를 입력하세요.', 'error'); return }
-    }
-    if (!window.confirm(withWinner ? `낙찰가 ${parseInt(closeForm.finalPrice).toLocaleString()}원으로 낙찰 처리하시겠습니까?` : '유찰 처리하시겠습니까?')) return
-
-    const body = withWinner
-      ? { winnerId: closeForm.winnerId.trim(), finalPrice: parseInt(closeForm.finalPrice) }
-      : {}
+  async function doCloseAuction(forceFail: boolean) {
+    const body = { forceFail }
     const r = await apiCall('POST', `/api/v1/auctions/${id}/close`, body, token)
     if (r.ok) {
-      toast(withWinner ? '낙찰 처리되었습니다.' : '유찰 처리되었습니다.', 'success')
+      toast(forceFail ? '유찰 처리되었습니다.' : '낙찰 처리되었습니다.', 'success')
       setCloseOpen(false)
       loadAuction()
     } else {
@@ -556,6 +545,10 @@ export default function AuctionDetailPage() {
                 <div className="meta-label">경매 시작</div>
                 <div className="meta-val">{fmtDate(auction.startAt)}</div>
               </div>
+              <div className="meta-item">
+                <div className="meta-label">경매 마감</div>
+                <div className="meta-val">{fmtDate(auction.endAt)}</div>
+              </div>
               {isWon && (auction.finalPrice || currentPrice) > 0 && (
                 <div className="meta-item">
                   <div className="meta-label">낙찰가</div>
@@ -605,7 +598,7 @@ export default function AuctionDetailPage() {
                 {isAdmin && auction.status === 'PROGRESS' && (
                   <button className="btn btn-accent btn-sm" onClick={openCloseModal}>조기 낙찰/마감</button>
                 )}
-                {canControl && (auction.status === 'READY' || auction.status === 'PROGRESS') && (
+                {canControl && auction.status === 'READY' && (
                   <button className="btn btn-danger btn-sm" onClick={adminCancelAuction}>경매 취소</button>
                 )}
               </div>
@@ -810,43 +803,26 @@ export default function AuctionDetailPage() {
         <div className="modal-backdrop open" onClick={e => e.target === e.currentTarget && setCloseOpen(false)}>
           <div className="modal" style={{ maxWidth: '440px' }}>
             <div className="modal-title">
-              조기 낙찰 / 마감
+              조기 마감
               <button className="modal-close" onClick={() => setCloseOpen(false)}>×</button>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--neu500)', marginBottom: '20px' }}>
-              낙찰자 정보를 입력하면 <strong>낙찰 처리</strong>, 비워두고 유찰 처리를 누르면 <strong>유찰</strong>됩니다.
+              현재 최고가 입찰자를 자동 낙찰 처리하거나, 입찰 여부와 관계없이 강제 유찰 처리합니다.
             </p>
-            <div className="form-group">
-              <label>낙찰자 ID (UUID)</label>
-              <input
-                value={closeForm.winnerId}
-                onChange={e => setCloseForm(p => ({ ...p, winnerId: e.target.value }))}
-                placeholder="낙찰자 유저 UUID"
-              />
-            </div>
-            <div className="form-group">
-              <label>최종 낙찰가 (원)</label>
-              <input
-                type="number" min="1"
-                value={closeForm.finalPrice}
-                onChange={e => setCloseForm(p => ({ ...p, finalPrice: e.target.value }))}
-                placeholder="낙찰가 입력"
-              />
-            </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
               <button
                 className="btn btn-primary"
                 style={{ flex: 1 }}
-                onClick={() => doCloseAuction(true)}
+                onClick={() => doCloseAuction(false)}
               >
-                🏆 낙찰 처리
+                최고가 조기 낙찰
               </button>
               <button
                 className="btn btn-danger"
                 style={{ flex: 1 }}
-                onClick={() => doCloseAuction(false)}
+                onClick={() => doCloseAuction(true)}
               >
-                유찰 처리
+                강제 유찰 종료
               </button>
             </div>
           </div>
