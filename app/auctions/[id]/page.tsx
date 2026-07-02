@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Client } from '@stomp/stompjs'
 import { apiCall, GW } from '@/lib/api'
@@ -55,6 +55,7 @@ export default function AuctionDetailPage() {
   const { token, userId, userRole, isLoaded } = useAuth()
   const toast = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [auction, setAuction] = useState<Auction | null>(null)
   const [loading, setLoading] = useState(true)
@@ -147,11 +148,22 @@ export default function AuctionDetailPage() {
       )
       if (order) {
         setWinningOrder(order)
-        setWinningPaid(order.status === 'COMPLETED')
+        const paid = order.status === 'COMPLETED'
+        setWinningPaid(paid)
         if (order.orderId) fetchWinningPayment(order.orderId)
+        return paid
       }
     }
+    return false
   }, [token, id, fetchWinningPayment])
+
+  // 결제 승인 직후에는 order-service가 Kafka outbox 이벤트를 아직 반영하지 못했을 수 있어 잠시 재시도한다.
+  const pollWinningOrder = useCallback(async () => {
+    for (let i = 0; i < 6; i++) {
+      if (await checkWinningOrder()) return
+      await new Promise(res => setTimeout(res, 1500))
+    }
+  }, [checkWinningOrder])
 
   const connectBid = useCallback(async (auctionId: string) => {
     // 이미 연결 시도 중이면 무시 (중복 구독 방지)
@@ -223,9 +235,20 @@ export default function AuctionDetailPage() {
     const r = await apiCall('GET', '/api/v1/orders/deposit/me?page=0&size=50', undefined, token)
     if (r.ok) {
       const orders: { auctionId: string; status: string }[] = r.data?.data?.content || []
-      setHasPaidDeposit(orders.some(o => o.auctionId === id && o.status === 'PAYMENT_SUCCESS'))
+      const paid = orders.some(o => o.auctionId === id && o.status === 'PAYMENT_SUCCESS')
+      if (paid) setHasPaidDeposit(true)
+      return paid
     }
+    return false
   }, [token, id])
+
+  // 결제 승인 직후에는 order-service가 Kafka outbox 이벤트를 아직 반영하지 못했을 수 있어 잠시 재시도한다.
+  const pollDepositStatus = useCallback(async () => {
+    for (let i = 0; i < 6; i++) {
+      if (await checkDepositStatus()) return
+      await new Promise(res => setTimeout(res, 1500))
+    }
+  }, [checkDepositStatus])
 
   const loadAuction = useCallback(async () => {
     setLoading(true)
@@ -256,22 +279,61 @@ export default function AuctionDetailPage() {
     setLoading(false)
   }, [id, token, toast, connectBid, syncCurrentPrice, checkWinningOrder, userRole])
 
+  // 경매 종료 시각이 지나도 실제 낙찰 처리는 스케줄러(shedlock)가 비동기로 수행하므로,
+  // 카운트다운이 0이 된 뒤에도 상태가 바뀔 때까지 주기적으로 다시 조회한다.
+  const refreshAuctionStatus = useCallback(async () => {
+    const r = await apiCall('GET', `/api/v1/auctions/${id}`, undefined, token)
+    if (r.ok) {
+      const a: Auction = r.data?.data || r.data
+      setAuction(a)
+      if (a.status !== 'PROGRESS') {
+        setDeadline(null)
+        if (a.status === 'WON' && token && userRole === 'BUYER') checkWinningOrder()
+      }
+      return a.status
+    }
+    return null
+  }, [id, token, userRole, checkWinningOrder])
+
+  useEffect(() => {
+    if (remainingMs > 0 || auction?.status !== 'PROGRESS') return
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      if (stopped) return
+      const status = await refreshAuctionStatus()
+      if (!stopped && status === 'PROGRESS') timer = setTimeout(poll, 2000)
+    }
+    timer = setTimeout(poll, 2000)
+    return () => { stopped = true; clearTimeout(timer) }
+  }, [remainingMs, auction?.status, refreshAuctionStatus])
+
   useEffect(() => {
     if (!token || userRole !== 'BUYER' || !id) return
-    const onVisible = () => { if (!document.hidden) checkDepositStatus() }
+    const onVisible = () => {
+      if (document.hidden) return
+      checkDepositStatus()
+      checkWinningOrder()
+    }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [token, userRole, id, checkDepositStatus])
+  }, [token, userRole, id, checkDepositStatus, checkWinningOrder])
 
   useEffect(() => {
     if (!isLoaded || !id) return
     let cancelled = false
 
     if (!cancelled) loadAuction()
-    if (!cancelled && token && userRole === 'BUYER') checkDepositStatus()
+    if (!cancelled && token && userRole === 'BUYER') {
+      const justPaid = searchParams.get('paid')
+      if (justPaid === 'deposit') pollDepositStatus()
+      else checkDepositStatus()
+      if (justPaid === 'winning') pollWinningOrder()
+      if (justPaid) router.replace(`/auctions/${id}`)
+    }
 
     return () => { cancelled = true }
-  }, [id, isLoaded, token, userRole, loadAuction, checkDepositStatus])
+  }, [id, isLoaded, token, userRole, loadAuction, checkDepositStatus, pollDepositStatus, pollWinningOrder, searchParams, router])
 
   useEffect(() => {
     if (!deadline) { setRemainingMs(0); return }

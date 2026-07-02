@@ -39,7 +39,8 @@ function PaymentSuccessContent() {
       if (r.ok) {
         setStatus('success')
         toast(isWinning ? '낙찰금 결제가 완료되었습니다!' : '보증금 결제가 성공적으로 완료되었습니다!', 'success')
-        setTimeout(() => router.replace(backHref), 1500)
+        const paidHref = auctionId ? `${backHref}?paid=${type}` : backHref
+        setTimeout(() => router.replace(paidHref), 1500)
       } else {
         setStatus('error')
         toast('결제 승인 실패: ' + (r.data?.message || r.data?.data?.message || ''), 'error')
@@ -48,7 +49,7 @@ function PaymentSuccessContent() {
     }
 
     confirm()
-  }, [isLoaded, paymentKey, orderId, backHref, amount, token, router, toast, isWinning])
+  }, [isLoaded, paymentKey, orderId, backHref, auctionId, type, amount, token, router, toast, isWinning])
 
   return (
     <div className="container" style={{ textAlign: 'center', paddingTop: '80px' }}>
